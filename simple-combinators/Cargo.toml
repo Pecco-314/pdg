@@ -1,12 +1,12 @@
 [package]
-name = "pdg"
+name = "simple-combinators"
 version = "0.1.0"
 authors = ["Pecco <pecco@qq.com>"]
 edition = "2018"
-include = ["data/*.*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-"simple-combinators" = { version = "0.1", path="simple-combinators"}
-"rand" = "^0.7"
+derive_more = "^0.99"
+
+[unstable]
