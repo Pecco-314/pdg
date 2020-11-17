@@ -1,7 +1,7 @@
-use crate::token::Token;
+use crate::token::*;
 use simple_combinators::{
     combinator::optional,
-    parser::{char, into_integer, spaces},
+    parser::{char, into_integer, spaces, string},
     ParseError, Parser,
 };
 #[derive(Copy, Clone)]
@@ -16,10 +16,10 @@ impl Parser for RepeatedToken {
             .parse(buf)? as usize;
         let mut v = Vec::new();
         for i in token().iter(buf) {
-            v.push(i);
+            v.push(i.clone());
         }
         char('}').parse(buf)?;
-        Ok(Token::Repeat(times, v))
+        Ok(Token::Gen(Repeat(times, v)))
     }
 }
 fn repeated_token() -> RepeatedToken {
@@ -31,8 +31,8 @@ fn random_integer_token() -> impl Parser<ParseResult = Token> {
         .with(into_integer())
         .and(optional(char(',').with(into_integer())))
         .map(|(a, opt)| match opt {
-            Some(b) => Token::RandomIntegerBetween(a, b),
-            None => Token::RandomIntegerNoGreaterThan(a),
+            Some(b) => Token::Gen(RandomIntegerBetween(a, b)),
+            None => Token::Gen(RandomIntegerNoGreaterThan(a)),
         })
 }
 
@@ -40,9 +40,13 @@ pub fn token() -> impl Parser<ParseResult = Token> {
     spaces()
         .with(
             random_integer_token()
-                .or(into_integer().map(|i| Token::ConstantInteger(i)))
+                .or(into_integer().map(|i| Token::Gen(ConstantInteger(i))))
                 .or(repeated_token())
-                .or(char('/').map(|_| Token::NewLine)),
+                .or(char('/').map(|_| Token::Gen(NewLine)))
+                .or(char('<').map(|_| Token::Op(LessThan)))
+                .or(char('>').map(|_| Token::Op(GreaterThan)))
+                .or(string("<=").map(|_| Token::Op(NoGreaterThan)))
+                .or(string(">=").map(|_| Token::Op(NoLessThan))),
         )
         .skip(spaces())
 }
