@@ -39,6 +39,8 @@ mod tests {
         assert_ok!(one_of("abc").parse(&mut "cow"), 'c');
         let s = String::from("ocean");
         assert_ok!(one_of("aeiou").parse(&mut s.as_str()), 'o');
+
+        assert_ok!(string("love").parse(&mut "love"), "love");
     }
     #[test]
     fn test_combinators() {

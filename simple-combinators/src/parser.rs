@@ -47,3 +47,19 @@ pub fn into_integer() -> impl Parser<ParseResult = i64> {
 pub fn integer() -> impl Parser<ParseResult = i64> {
     many1(one_of("-0123456789")).flat_map(|s: String| s.parse::<i64>())
 }
+
+#[derive(Copy, Clone)]
+pub struct Str<'a> {
+    string: &'a str,
+}
+impl<'a> Parser for Str<'a> {
+    type ParseResult = &'a str;
+    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+        (&buf[..self.string.len()] == self.string)
+            .then_some(self.string)
+            .ok_or(ParseError)
+    }
+}
+pub fn string(expected: &str) -> impl Parser<ParseResult = &str> {
+    Str { string: expected }
+}
