@@ -6,6 +6,19 @@ use simple_combinators::{
 };
 use std::ops::Range;
 
+pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
+    spaces()
+        .skip(string(":>"))
+        .skip(spaces())
+        .with(size())
+        .skip(spaces())
+        .and(optional(string("..").skip(spaces()).with(size())))
+        .map(|(a, op)| match op {
+            Some(b) => a..b + 1,
+            None => a..a + 1,
+        })
+}
+
 #[derive(Copy, Clone)]
 struct Repeated;
 impl Parser for Repeated {
@@ -55,17 +68,10 @@ fn random_integer_token() -> impl Parser<ParseResult = Token> {
         })
 }
 
-pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
-    spaces()
-        .skip(string(":>"))
-        .skip(spaces())
-        .with(size())
-        .skip(spaces())
-        .and(optional(string("..").skip(spaces()).with(size())))
-        .map(|(a, op)| match op {
-            Some(b) => a..b + 1,
-            None => a..a + 1,
-        })
+fn random_string_token() -> impl Parser<ParseResult = Token> {
+    char('s')
+        .with(into_num())
+        .map(|x| Token::Gen(RandomString(RandomString::Lower(x)))) // TODO:add upper and oneof
 }
 
 pub fn token() -> impl Parser<ParseResult = Token> {
@@ -75,6 +81,7 @@ pub fn token() -> impl Parser<ParseResult = Token> {
                 .or(into_num().map(|i| Token::Gen(ConstantInteger(i))))
                 .or(array_token())
                 .or(testcase_token())
+                .or(random_string_token())
                 .or(char('/').map(|_| Token::Gen(NewLine)))
                 .or(char('<').map(|_| Token::Op(LessThan)))
                 .or(char('>').map(|_| Token::Op(GreaterThan)))

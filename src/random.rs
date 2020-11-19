@@ -34,3 +34,26 @@ pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
         }
     }
 }
+
+pub fn random_string(rs: &RandomString) -> String {
+    let mut s = String::new();
+    match rs {
+        RandomString::Lower(times) => {
+            for _ in 0..*times {
+                s.push(thread_rng().gen_range(b'a', b'z' + 1) as char);
+            }
+        }
+        RandomString::Upper(times) => {
+            for _ in 0..*times {
+                s.push(thread_rng().gen_range(b'A', b'Z' + 1) as char);
+            }
+        }
+        RandomString::OneOf(times, dict) => {
+            let dict: Vec<char> = dict.chars().collect();
+            for _ in 0..*times {
+                s.push(*dict[..].choose(&mut thread_rng()).unwrap());
+            }
+        }
+    }
+    s
+}

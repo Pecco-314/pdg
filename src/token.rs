@@ -1,9 +1,16 @@
 use crate::details::With;
-use crate::random::random_pair;
+use crate::random::*;
 use rand::prelude::*;
 pub use Gen::*;
 pub use Op::*;
 
+#[derive(Clone, Debug)]
+pub enum RandomString {
+    Lower(usize),
+    Upper(usize),
+    OneOf(usize, String),
+}
+// 到处拷贝一定程度上折损了性能，但我水平有限，绕不清楚生命周期
 #[derive(Clone, Debug)]
 pub enum Gen {
     NewLine,
@@ -13,6 +20,7 @@ pub enum Gen {
     Array(usize, Vec<Token>),
     TestCase(usize, Vec<Token>),
     RandomPair(i64, i64, i64, i64, Op),
+    RandomString(RandomString),
 }
 #[derive(Copy, Clone, Debug)]
 pub enum Op {
@@ -82,7 +90,6 @@ impl Gen {
                 Some(s)
             }
             TestCase(times, v) => {
-                //TODO: remove clone here
                 Some(times.to_string().with('\n') + Array(*times, v.clone()).generate()?.as_str())
             }
             RandomPair(l1, r1, l2, r2, op) => {
@@ -91,6 +98,7 @@ impl Gen {
                 s.push_str(&b.to_string());
                 Some(s.with(' '))
             }
+            RandomString(rs) => Some(random_string(&rs)),
         }
     }
 }
