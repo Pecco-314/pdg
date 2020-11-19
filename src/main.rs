@@ -7,8 +7,14 @@ use parser::{file_range, token};
 use simple_combinators::Parser;
 use std::env;
 use std::fs;
+use std::io;
 use std::path::Path;
 use token::{cul_token, Token};
+
+fn pause() {
+    println!("Finished!");
+    io::stdin().read_line(&mut String::new()).unwrap();
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -27,13 +33,13 @@ fn main() {
 
     let mut exit = false;
     let mut is_first = true;
-    while !exit {
+    'out: while !exit {
         let range = file_range().parse(&mut buf);
         let range = match range {
             Ok(r) => r,
             Err(_) => {
                 if !is_first {
-                    return;
+                    break 'out;
                 }
                 exit = true;
                 1..11
@@ -55,4 +61,5 @@ fn main() {
             fs::write(target_path, s).expect("Failed to write");
         }
     }
+    pause();
 }
