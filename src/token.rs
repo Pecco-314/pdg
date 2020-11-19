@@ -68,7 +68,7 @@ impl Gen {
                 Some(thread_rng().gen_range(*a, *b + 1).to_string().with(' '))
             }
             RandomIntegerNoGreaterThan(a) => {
-                Some(thread_rng().gen_range(0, *a).to_string().with(' '))
+                Some(thread_rng().gen_range(0, *a + 1).to_string().with(' '))
             }
             Repeat(times, v) => {
                 let mut s = String::new();
@@ -81,7 +81,7 @@ impl Gen {
                 Some(s)
             }
             RandomPair(l1, r1, l2, r2, op) => {
-                let (a, b) = random_pair(*l1, *r1, *l2, *r2, op);
+                let (a, b) = random_pair(*l1, *r1, *l2, *r2, *op);
                 let mut s = a.to_string().with(' ');
                 s.push_str(&b.to_string());
                 Some(s.with(' '))

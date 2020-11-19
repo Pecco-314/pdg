@@ -14,7 +14,7 @@ fn main() {
     let path = if args.len() > 1 {
         &args[1]
     } else {
-        "template.txt"
+        "template.txt" // 默认路径
     };
     let parent = Path::new(path).parent().expect("invaild path format");
 

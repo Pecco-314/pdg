@@ -1,37 +1,37 @@
 use super::combinator::*;
 use super::{ParseError, Parser};
 
-/// 匹配指定字符
+/// 解析指定字符
 pub fn char(expected: char) -> impl Parser<ParseResult = char> {
     satisfy(move |c| c == expected)
 }
 
-/// 匹配任意字符
+/// 解析任意字符
 pub fn any() -> impl Parser<ParseResult = char> {
     satisfy(|_| true)
 }
 
-/// 匹配十进制数字，返回字符
+/// 解析十进制数字
 pub fn digit() -> impl Parser<ParseResult = char> {
     satisfy(|c: char| c.is_digit(10))
 }
 
-/// 匹配拉丁字母
+/// 解析拉丁字母
 pub fn letter() -> impl Parser<ParseResult = char> {
     satisfy(|c: char| c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z')
 }
 
-/// 匹配空白符
+/// 解析空白符
 pub fn space() -> impl Parser<ParseResult = char> {
     satisfy(|c: char| c.is_whitespace())
 }
 
-/// 匹配并跳过任意数目的空白符
+/// 解析任意数量空白符，返回()
 pub fn spaces() -> impl Parser<ParseResult = ()> {
     many(ignore(space()))
 }
 
-/// 匹配存在于某一字符串内的字符
+/// 解析所给字符串中的任意字符
 pub fn one_of(s: &str) -> impl Parser<ParseResult = char> + '_ {
     satisfy(move |c| s.contains(c))
 }
@@ -55,7 +55,8 @@ pub struct Str<'a> {
 impl<'a> Parser for Str<'a> {
     type ParseResult = &'a str;
     fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
-        (&buf[..self.string.len()] == self.string)
+        let len = self.string.len();
+        (buf.len() >= len && &buf[..len] == self.string)
             .then_some(self.string)
             .ok_or(ParseError)
     }
