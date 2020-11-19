@@ -1,4 +1,4 @@
-use crate::details::WithChar;
+use crate::details::With;
 use crate::random::random_pair;
 use rand::prelude::*;
 pub use Gen::*;

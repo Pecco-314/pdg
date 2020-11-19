@@ -41,6 +41,9 @@ mod tests {
         assert_ok!(one_of("aeiou").parse(&mut s.as_str()), 'o');
 
         assert_ok!(string("love").parse(&mut "love"), "love");
+        let mut buf = "love you";
+        assert_ok!(string("love").parse(&mut buf), "love");
+        assert_eq!(buf, " you");
     }
     #[test]
     fn test_combinators() {
@@ -160,9 +163,9 @@ mod tests {
         assert_ok!(char('a').or(char('c')).parse(&mut "candy"), 'c');
         assert_ok!(one_of("abc").or(char('d')).parse(&mut "candy"), 'c');
         assert_ok!(
-            integer()
+            into_integer()
                 .skip(char('!'))
-                .or(integer().skip(char('?')))
+                .or(into_integer().skip(char('?')))
                 .parse(&mut "123?"),
             123
         );
@@ -177,8 +180,8 @@ mod tests {
         assert_err!(into_integer().parse(&mut "1.432e2"));
         assert_err!(into_integer().parse(&mut "-1242.31"));
 
-        assert_ok!(integer().parse(&mut "1.432e10"), 1);
-        assert_ok!(integer().parse(&mut "1.432e2"), 1);
-        assert_ok!(integer().parse(&mut "-1242.31"), -1242);
+        assert_ok!(size().parse(&mut "1.432e10"), 1);
+        assert_ok!(size().parse(&mut "1.432e2"), 1);
+        assert_err!(size().parse(&mut "-1242.31"));
     }
 }

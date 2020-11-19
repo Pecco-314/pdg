@@ -1,9 +1,10 @@
 use crate::token::*;
 use simple_combinators::{
     combinator::optional,
-    parser::{char, into_integer, spaces, string},
+    parser::{char, into_integer, size, spaces, string},
     ParseError, Parser,
 };
+use std::ops::Range;
 #[derive(Copy, Clone)]
 struct RepeatedToken;
 impl Parser for RepeatedToken {
@@ -49,4 +50,17 @@ pub fn token() -> impl Parser<ParseResult = Token> {
                 .or(string(">=").map(|_| Token::Op(NoLessThan))),
         )
         .skip(spaces())
+}
+
+pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
+    spaces()
+        .skip(string(":>"))
+        .skip(spaces())
+        .with(size())
+        .skip(spaces())
+        .and(optional(string("..").skip(spaces()).with(size())))
+        .map(|(a, op)| match op {
+            Some(b) => a..b + 1,
+            None => a..a + 1,
+        })
 }
