@@ -1,5 +1,6 @@
-use super::combinator::*;
-use super::{ParseError, Parser};
+use crate::combinator::*;
+use crate::{ParseError, Parser};
+use num::traits::FromPrimitive;
 
 /// 解析指定字符
 pub fn char(expected: char) -> impl Parser<ParseResult = char> {
@@ -41,9 +42,20 @@ pub fn number() -> impl Parser<ParseResult = f64> {
     many1(one_of("0123456789Ee-.")).flat_map(|s: String| s.parse::<f64>())
 }
 
-/// 解析能转化成整数的浮点数
-pub fn into_integer() -> impl Parser<ParseResult = i64> {
-    number().flat_map(|x| (x as i64 as f64 == x).then_some(x as i64).ok_or(ParseError))
+/// 解析能转化成某种数字类型的数字
+pub fn into_num<I>() -> impl Parser<ParseResult = I>
+where
+    I: FromPrimitive + std::fmt::Debug,
+{
+    const EPS: f64 = 1e-10;
+    number().flat_map(|x| {
+        if (x - x.trunc()).abs() < EPS {
+            // 小数部分足够小则解析成功
+            I::from_f64(x).ok_or(ParseError)
+        } else {
+            Err(ParseError)
+        }
+    })
 }
 
 /// 解析usize

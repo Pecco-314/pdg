@@ -4,23 +4,24 @@ use rand::prelude::*;
 pub use Gen::*;
 pub use Op::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Gen {
     NewLine,
     ConstantInteger(i64),
     RandomIntegerBetween(i64, i64),
     RandomIntegerNoGreaterThan(i64),
-    Repeat(usize, Vec<Token>),
+    Array(usize, Vec<Token>),
+    TestCase(usize, Vec<Token>),
     RandomPair(i64, i64, i64, i64, Op),
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Op {
     LessThan,
     GreaterThan,
     NoLessThan,
     NoGreaterThan,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Token {
     Gen(Gen),
     Op(Op),
@@ -70,7 +71,7 @@ impl Gen {
             RandomIntegerNoGreaterThan(a) => {
                 Some(thread_rng().gen_range(0, *a + 1).to_string().with(' '))
             }
-            Repeat(times, v) => {
+            Array(times, v) => {
                 let mut s = String::new();
                 let mut gens = cul_token(v)?;
                 for _ in 0..*times {
@@ -79,6 +80,10 @@ impl Gen {
                     }
                 }
                 Some(s)
+            }
+            TestCase(times, v) => {
+                //TODO: remove clone here
+                Some(times.to_string().with('\n') + Array(*times, v.clone()).generate()?.as_str())
             }
             RandomPair(l1, r1, l2, r2, op) => {
                 let (a, b) = random_pair(*l1, *r1, *l2, *r2, *op);

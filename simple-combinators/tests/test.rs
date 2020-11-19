@@ -163,9 +163,9 @@ mod tests {
         assert_ok!(char('a').or(char('c')).parse(&mut "candy"), 'c');
         assert_ok!(one_of("abc").or(char('d')).parse(&mut "candy"), 'c');
         assert_ok!(
-            into_integer()
+            into_num::<usize>()
                 .skip(char('!'))
-                .or(into_integer().skip(char('?')))
+                .or(into_num::<usize>().skip(char('?')))
                 .parse(&mut "123?"),
             123
         );
@@ -176,9 +176,9 @@ mod tests {
         assert_ok!(number().parse(&mut "1.432e2"), 1.432e2);
         assert_ok!(number().parse(&mut "-1242.31"), -1242.31);
 
-        assert_ok!(into_integer().parse(&mut "1.432e10"), 1.432e10 as i64);
-        assert_err!(into_integer().parse(&mut "1.432e2"));
-        assert_err!(into_integer().parse(&mut "-1242.31"));
+        assert_ok!(into_num::<i64>().parse(&mut "1.432e10"), 1.432e10 as i64);
+        assert_err!(into_num::<i64>().parse(&mut "1.432e2"));
+        assert_err!(into_num::<i64>().parse(&mut "-1242.31"));
 
         assert_ok!(size().parse(&mut "1.432e10"), 1);
         assert_ok!(size().parse(&mut "1.432e2"), 1);
