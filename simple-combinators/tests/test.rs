@@ -28,9 +28,9 @@ mod tests {
         assert_ok!(digit().parse(&mut "123"), '1');
         assert_err!(digit().parse(&mut "FF00FF"));
 
-        assert_ok!(letter().parse(&mut "Angel"), 'A');
-        assert_ok!(letter().parse(&mut "angel"), 'a');
-        assert_err!(letter().parse(&mut "非拉丁字母"));
+        assert_ok!(alpha().parse(&mut "Angel"), 'A');
+        assert_ok!(alpha().parse(&mut "angel"), 'a');
+        assert_err!(alpha().parse(&mut "非拉丁字母"));
 
         assert_ok!(many1::<_, String>(space()).parse(&mut " \r\n\t"), " \r\n\t");
 

@@ -8,9 +8,17 @@ pub use Op::*;
 pub enum RandomString {
     Lower(usize),
     Upper(usize),
+    Alpha(usize),
+    Bin(usize),
+    Oct(usize),
+    Dec(usize),
+    HexLower(usize),
+    HexUpper(usize),
+    Alnum(usize),
+    Graph(usize),
     OneOf(usize, String),
+    Within(usize, char, char),
 }
-// 到处拷贝一定程度上折损了性能，但我水平有限，绕不清楚生命周期
 #[derive(Clone, Debug)]
 pub enum Gen {
     NewLine,
@@ -98,7 +106,7 @@ impl Gen {
                 s.push_str(&b.to_string());
                 Some(s.with(' '))
             }
-            RandomString(rs) => Some(random_string(&rs)),
+            RandomString(rs) => random_string(&rs),
         }
     }
 }

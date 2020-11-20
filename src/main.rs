@@ -1,3 +1,4 @@
+#![feature(label_break_value)]
 mod details;
 mod parser;
 mod random;

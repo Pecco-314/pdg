@@ -1,5 +1,21 @@
 use crate::token::*;
-use rand::prelude::*;
+use rand::{seq::SliceRandom, thread_rng, Rng};
+macro_rules! distribute{
+    ($sum:expr; $($freq:expr, $func:expr);+)=>{{
+            let mut ans = None;
+            let mut cc = thread_rng().gen_range(0,$sum);
+            'lp:{$(
+                cc -= $freq;
+                if cc<0 {
+                    ans = Some($func()?);
+                    break 'lp;
+                }
+            )+
+            }
+            ans
+    }}
+}
+
 pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
     match op {
         LessThan => {
@@ -35,25 +51,60 @@ pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
     }
 }
 
-pub fn random_string(rs: &RandomString) -> String {
+pub fn random_char(l: char, r: char) -> Option<char> {
+    std::char::from_u32(thread_rng().gen_range(l as u32, r as u32 + 1))
+}
+
+pub fn random_string(rs: &RandomString) -> Option<String> {
+    use RandomString::*;
     let mut s = String::new();
     match rs {
-        RandomString::Lower(times) => {
-            for _ in 0..*times {
-                s.push(thread_rng().gen_range(b'a', b'z' + 1) as char);
-            }
-        }
-        RandomString::Upper(times) => {
-            for _ in 0..*times {
-                s.push(thread_rng().gen_range(b'A', b'Z' + 1) as char);
-            }
-        }
-        RandomString::OneOf(times, dict) => {
+        OneOf(times, dict) => {
             let dict: Vec<char> = dict.chars().collect();
             for _ in 0..*times {
-                s.push(*dict[..].choose(&mut thread_rng()).unwrap());
+                s.push(*dict[..].choose(&mut thread_rng())?);
             }
+            Some(s)
         }
+        Alpha(times) => {
+            for _ in 0..*times {
+                s.push(
+                    distribute!(52; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z'))?,
+                );
+            }
+            Some(s)
+        }
+        Alnum(times) => {
+            for _ in 0..*times {
+                s.push(
+                    distribute!(62; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z'); 10, || random_char('0','9'))?,
+                );
+            }
+            Some(s)
+        }
+        HexLower(times) => {
+            for _ in 0..*times {
+                s.push(distribute!(16; 10, || random_char('0', '9'); 6, || random_char('a', 'f'))?);
+            }
+            Some(s)
+        }
+        HexUpper(times) => {
+            for _ in 0..*times {
+                s.push(distribute!(16; 10, || random_char('0', '9'); 6, || random_char('A', 'F'))?);
+            }
+            Some(s)
+        }
+        Within(times, l, r) => {
+            for _ in 0..*times {
+                s.push(random_char(*l, *r)?);
+            }
+            Some(s)
+        }
+        Lower(times) => random_string(&Within(*times, 'a', 'z')),
+        Upper(times) => random_string(&Within(*times, 'A', 'Z')),
+        Bin(times) => random_string(&Within(*times, '0', '1')),
+        Oct(times) => random_string(&Within(*times, '0', '7')),
+        Dec(times) => random_string(&Within(*times, '0', '9')),
+        Graph(times) => random_string(&Within(*times, '!', '~')),
     }
-    s
 }

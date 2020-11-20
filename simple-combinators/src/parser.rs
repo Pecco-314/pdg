@@ -18,7 +18,7 @@ pub fn digit() -> impl Parser<ParseResult = char> {
 }
 
 /// 解析拉丁字母
-pub fn letter() -> impl Parser<ParseResult = char> {
+pub fn alpha() -> impl Parser<ParseResult = char> {
     satisfy(|c: char| c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z')
 }
 
