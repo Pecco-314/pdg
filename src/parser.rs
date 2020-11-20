@@ -22,18 +22,17 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
 fn parameter() -> impl Parser<ParseResult = Parameter> {
     number()
         .map(|i| Parameter::Int(i))
-        .or(number().map(|u| Parameter::Size(u)))
         .or(many1(alpha()).map(|s| Parameter::Enum(s)))
         .or(any()
             .between(char('\''), char('\''))
             .map(|c| Parameter::Char(c)))
 }
 
-fn with_parameters() -> impl Parser<ParseResult = Vec<Parameter>> {
+fn parameters() -> impl Parser<ParseResult = Vec<Parameter>> {
     parameter()
         .sep_by(spaces().with(char(',').skip(spaces())))
         .between(char('[').skip(spaces()), spaces().with(char(']')))
-        .or(parameter().sep_by(char(',')))
+        .or(parameter().sep_by(spaces().with(char(',')).skip(spaces())))
 }
 
 #[derive(Copy, Clone)]
@@ -76,13 +75,12 @@ fn testcase_token() -> impl Parser<ParseResult = Token> {
 }
 
 fn random_integer_token() -> impl Parser<ParseResult = Token> {
-    char('i')
-        .with(number())
-        .and(optional(char(',').with(number())))
-        .map(|(a, opt)| match opt {
-            Some(b) => Token::Gen(RandomIntegerBetween(a, b)),
-            None => Token::Gen(RandomIntegerNoGreaterThan(a)),
-        })
+    use Parameter::*;
+    char('i').with(parameters()).flat_map(|v| match &v[..] {
+        [Int(a)] => Ok(Token::Gen(RandomIntegerNoGreaterThan(*a))),
+        [Int(a), Int(b)] => Ok(Token::Gen(RandomIntegerBetween(*a, *b))),
+        _ => Err(ParseError),
+    })
 }
 
 fn random_string_token() -> impl Parser<ParseResult = Token> {

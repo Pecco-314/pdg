@@ -45,7 +45,6 @@ pub enum Token {
 #[derive(Clone, Debug)]
 pub enum Parameter {
     Int(i64),
-    Size(usize),
     Enum(String),
     Char(char),
 }
