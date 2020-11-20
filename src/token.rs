@@ -6,6 +6,16 @@ pub use Op::*;
 use Parameter::*;
 
 #[derive(Clone, Debug)]
+pub enum ConfigItem {
+    Fold(String),
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Config {
+    pub fold: Option<String>,
+}
+
+#[derive(Clone, Debug)]
 pub enum RandomString {
     Lower(usize),
     Upper(usize),

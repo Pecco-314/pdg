@@ -2,9 +2,44 @@ use crate::token::*;
 use num::cast::ToPrimitive;
 use simple_combinators::{combinator::optional, parser::*, ParseError, Parser};
 use std::ops::Range;
+use ConfigItem::*;
 use Parameter::*;
 use RandomString::*;
 use Token::*;
+
+pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
+    spaces()
+        .with(
+            string("#fold")
+                .with(parameters())
+                .flat_map(|v| match &v[..] {
+                    [Str(s)] => Ok(Fold(s.clone())),
+                    _ => Err(ParseError),
+                }),
+        )
+        .skip(spaces())
+}
+#[derive(Copy, Clone, Debug)]
+struct ConfigParser;
+impl Parser for ConfigParser {
+    type ParseResult = Config;
+    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+        let mut config = Config {
+            ..Default::default()
+        };
+        for item in config_item().iter(buf) {
+            match item {
+                Fold(s) => {
+                    config.fold = Some(s);
+                }
+            }
+        }
+        Ok(config)
+    }
+}
+pub fn config() -> impl Parser<ParseResult = Config> {
+    ConfigParser
+}
 
 pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
     spaces()
