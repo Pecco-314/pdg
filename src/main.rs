@@ -14,7 +14,6 @@ use std::{
 use token::{cul_token, Config, Token};
 
 fn pause() {
-    println!("Finished!");
     println!("(Press any key to exit)");
     io::stdin().read_line(&mut String::new()).unwrap();
 }
@@ -50,6 +49,7 @@ fn parse_and_generate(mut buf: &str, fold: PathBuf) {
             break;
         }
     }
+    println!("Finished!");
 }
 
 fn generate(fileid: usize, tokens: &Vec<Token>, fold: &PathBuf) {
@@ -88,7 +88,6 @@ fn get_fold(template: &PathBuf, config: &Config) -> PathBuf {
             .expect("invaild path format")
             .join("testdata")
     };
-    println!("{:?}", fold);
     fs::create_dir_all(&fold).expect("Failed to create directory");
     fold
 }
@@ -99,5 +98,7 @@ fn main() {
     let config = config().parse(&mut buf).unwrap(); // 解析配置
     let fold = get_fold(&path, &config);
     parse_and_generate(buf, fold);
-    pause();
+    if let Some(true) | None = config.pause {
+        pause();
+    }
 }

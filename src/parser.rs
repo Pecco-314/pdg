@@ -15,7 +15,13 @@ pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
                 .flat_map(|v| match &v[..] {
                     [Str(s)] => Ok(Fold(s.clone())),
                     _ => Err(ParseError),
-                }),
+                })
+                .or(string("#pause")
+                    .with(parameters())
+                    .flat_map(|v| match &v[..] {
+                        [Bool(b)] => Ok(Pause(*b)),
+                        _ => Err(ParseError),
+                    })),
         )
         .skip(spaces())
 }
@@ -31,6 +37,9 @@ impl Parser for ConfigParser {
             match item {
                 Fold(s) => {
                     config.fold = Some(s);
+                }
+                Pause(b) => {
+                    config.pause = Some(b);
                 }
             }
         }
@@ -57,9 +66,11 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
 fn parameter() -> impl Parser<ParseResult = Parameter> {
     number()
         .map(|i| Int(i))
-        .or(word().map(|e| Enum(e)))
         .or(quoted_string().map(|s| Str(s)))
         .or(any().between(char('\''), char('\'')).map(|c| Char(c)))
+        .or(string("true").map(|_| Bool(true)))
+        .or(string("false").map(|_| Bool(false)))
+        .or(word().map(|e| Enum(e)))
 }
 
 fn parameters() -> impl Parser<ParseResult = Vec<Parameter>> {

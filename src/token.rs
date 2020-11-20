@@ -8,11 +8,13 @@ use Parameter::*;
 #[derive(Clone, Debug)]
 pub enum ConfigItem {
     Fold(String),
+    Pause(bool),
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     pub fold: Option<String>,
+    pub pause: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -60,6 +62,7 @@ pub enum Parameter {
     Char(char),
     Enum(String),
     Str(String),
+    Bool(bool),
 }
 
 fn cul(a: &Gen, b: &Gen, op: &Op) -> Option<Gen> {
