@@ -18,7 +18,7 @@ mod tests {
         assert_err!(satisfy(|c| c != 'A').parse(&mut ""));
     }
     #[test]
-    fn test_char_parser() {
+    fn test_char() {
         assert_ok!(any().parse(&mut "你好"), '你');
         assert_err!(any().parse(&mut ""));
 
@@ -39,11 +39,23 @@ mod tests {
         assert_ok!(one_of("abc").parse(&mut "cow"), 'c');
         let s = String::from("ocean");
         assert_ok!(one_of("aeiou").parse(&mut s.as_str()), 'o');
-
+    }
+    #[test]
+    fn test_string() {
         assert_ok!(string("love").parse(&mut "love"), "love");
         let mut buf = "love you";
         assert_ok!(string("love").parse(&mut buf), "love");
         assert_eq!(buf, " you");
+
+        assert_ok!(word().parse(&mut "you are fine"), "you");
+        assert_ok!(word().parse(&mut "many1 is a function"), "many");
+
+        assert_ok!(quoted_string().parse(&mut "\"I love you\""), "I love you");
+        assert_ok!(
+            quoted_string().parse(&mut "\"You say \\\"I love you\\\"?\""),
+            "You say \"I love you\"?"
+        );
+        assert_err!(quoted_string().parse(&mut "\'words in single quotes won't be parsed\'"));
     }
     #[test]
     fn test_combinators() {

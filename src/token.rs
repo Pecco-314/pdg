@@ -44,9 +44,10 @@ pub enum Token {
 }
 #[derive(Clone, Debug)]
 pub enum Parameter {
-    Int(i64),
-    Enum(String),
+    Int(i64), // Size类型参数当作Int解析再转化
     Char(char),
+    Enum(String),
+    Str(String),
 }
 
 fn cul(a: &Gen, b: &Gen, op: &Op) -> Option<Gen> {

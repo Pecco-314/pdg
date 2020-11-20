@@ -80,6 +80,25 @@ impl<'a> Parser for Str<'a> {
         }
     }
 }
+/// 解析指定字符串
 pub fn string(expected: &str) -> impl Parser<ParseResult = &str> {
     Str { string: expected }
+}
+
+/// 解析任意由字母组成的单词
+pub fn word() -> impl Parser<ParseResult = String> {
+    many1(alpha())
+}
+
+/// 解析由双引号括住的字符串
+pub fn quoted_string() -> impl Parser<ParseResult = String> {
+    many1(
+        (string("\\\"").map(|_| '\"'))
+            .or(string("\\\n").map(|_| '\n'))
+            .or(string("\\\r").map(|_| '\r'))
+            .or(string("\\\t").map(|_| '\t'))
+            .or(string("\\\\").map(|_| '\\'))
+            .or(satisfy(|c| c != '"')),
+    )
+    .between(char('"'), char('"'))
 }
