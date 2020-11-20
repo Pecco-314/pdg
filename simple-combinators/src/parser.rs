@@ -1,6 +1,8 @@
 use crate::combinator::*;
 use crate::{ParseError, Parser};
 use num::traits::FromPrimitive;
+use std::error::Error;
+use std::str::FromStr;
 
 /// 解析指定字符
 pub fn char(expected: char) -> impl Parser<ParseResult = char> {
@@ -37,30 +39,29 @@ pub fn one_of(s: &str) -> impl Parser<ParseResult = char> + '_ {
     satisfy(move |c| s.contains(c))
 }
 
-/// 解析数字（浮点数）
-pub fn number() -> impl Parser<ParseResult = f64> {
+/// 解析浮点数
+pub fn float() -> impl Parser<ParseResult = f64> {
     many1(one_of("0123456789Ee-.")).flat_map(|s: String| s.parse::<f64>())
 }
 
-/// 解析能转化成某种数字类型的数字
-pub fn into_num<I>() -> impl Parser<ParseResult = I>
+/// 解析某种数字类型
+pub fn number<I>() -> impl Parser<ParseResult = I>
 where
-    I: FromPrimitive + std::fmt::Debug,
+    I: FromPrimitive + FromStr,
+    <I as FromStr>::Err: Error,
 {
     const EPS: f64 = 1e-10;
-    number().flat_map(|x| {
-        if (x - x.trunc()).abs() < EPS {
-            // 小数部分足够小则解析成功
-            I::from_f64(x).ok_or(ParseError)
-        } else {
-            Err(ParseError)
-        }
-    })
-}
-
-/// 解析usize
-pub fn size() -> impl Parser<ParseResult = usize> {
-    many1(one_of("0123456789")).flat_map(|s: String| s.parse::<usize>())
+    float()
+        .flat_map(|x| {
+            if (x - x.trunc()).abs() < EPS {
+                // 小数部分足够小则解析成功
+                I::from_f64(x).ok_or(ParseError)
+            } else {
+                Err(ParseError)
+            }
+        })
+        .or(many1(one_of("-0123456789")).flat_map(|s: String| s.parse::<I>())) // 解析失败则尝试只解析数字和负号
+        .or(many1(one_of("0123456789")).flat_map(|s: String| s.parse::<I>())) // 再解析失败则尝试只解析数字
 }
 
 #[derive(Copy, Clone)]

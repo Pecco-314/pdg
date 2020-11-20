@@ -14,6 +14,7 @@ use token::{cul_token, Token};
 
 fn pause() {
     println!("Finished!");
+    println!("(press any key to exit)");
     io::stdin().read_line(&mut String::new()).unwrap();
 }
 
