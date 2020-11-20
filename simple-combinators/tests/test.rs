@@ -51,9 +51,9 @@ mod tests {
         assert_err!(char('#').with(char('a')).parse(&mut "a#"));
         assert_err!(char('#').with(char('a')).parse(&mut "#"));
 
-        assert_ok!(letter().skip(char('!')).parse(&mut "a!"), 'a');
-        assert_err!(letter().skip(char('!')).parse(&mut "1!"));
-        assert_err!(letter().skip(char('!')).parse(&mut "a?"));
+        assert_ok!(alpha().skip(char('!')).parse(&mut "a!"), 'a');
+        assert_err!(alpha().skip(char('!')).parse(&mut "1!"));
+        assert_err!(alpha().skip(char('!')).parse(&mut "a?"));
 
         assert_ok!(digit().and(digit()).parse(&mut "12"), ('1', '2'));
 
@@ -74,7 +74,7 @@ mod tests {
             char('(')
                 .with(digit())
                 .skip(char(','))
-                .and(letter())
+                .and(alpha())
                 .skip(char(')'))
                 .parse(&mut "(1,a)"),
             ('1', 'a')
@@ -125,6 +125,20 @@ mod tests {
         );
         assert_ok!(many::<_, String>(any()).parse(&mut ""), "");
         assert_err!(many1::<_, String>(any()).parse(&mut ""));
+
+        assert_ok!(
+            alpha().sep_by::<_, String>(char(',')).parse(&mut "a,a,a"),
+            "aaa"
+        );
+        assert_ok!(
+            alpha().sep_by::<_, String>(char(',')).parse(&mut "a,a,a,"),
+            "aaa"
+        );
+        assert_err!(alpha().sep_by::<_, String>(char(',')).parse(&mut ",a,a,a"));
+        assert_ok!(
+            alpha().sep_by::<_, String>(char(',')).parse(&mut "a;a;a"),
+            "a"
+        );
     }
     #[test]
     fn test_attempt() {

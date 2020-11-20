@@ -1,7 +1,7 @@
 use crate::token::*;
 use simple_combinators::{
-    combinator::optional,
-    parser::{char, into_num, size, spaces, string},
+    combinator::{many1, optional},
+    parser::{alpha, any, char, into_num, size, spaces, string},
     ParseError, Parser,
 };
 use std::ops::Range;
@@ -17,6 +17,23 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
             Some(b) => a..b + 1,
             None => a..a + 1,
         })
+}
+
+fn parameter() -> impl Parser<ParseResult = Parameter> {
+    into_num()
+        .map(|i| Parameter::Int(i))
+        .or(into_num().map(|u| Parameter::Size(u)))
+        .or(many1(alpha()).map(|s| Parameter::Enum(s)))
+        .or(any()
+            .between(char('\''), char('\''))
+            .map(|c| Parameter::Char(c)))
+}
+
+fn with_parameters() -> impl Parser<ParseResult = Vec<Parameter>> {
+    parameter()
+        .sep_by(spaces().with(char(',').skip(spaces())))
+        .between(char('[').skip(spaces()), spaces().with(char(']')))
+        .or(parameter().sep_by(char(',')))
 }
 
 #[derive(Copy, Clone)]

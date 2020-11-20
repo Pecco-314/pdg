@@ -2,6 +2,20 @@ use super::{ParseError, Parser};
 use std::error::Error;
 use std::marker::PhantomData;
 
+macro_rules! impl_copy_and_clone {
+    ($struct:ident<$($ctype:ident),*; $($ptype:ident),*>) => {
+        impl<$($ctype),*, $($ptype),*> Copy for $struct<$($ctype),* ,$($ptype),*> where $($ctype : Copy),* {}
+        impl<$($ctype),* ,$($ptype),*> Clone for $struct<$($ctype),* ,$($ptype),*>
+        where
+        $($ctype : Copy),*
+        {
+            fn clone(&self) -> Self {
+                *self
+            }
+        }
+    };
+} // 为无法自动derive Copy & Clone的结构体实现Copy & Clone
+
 #[derive(Clone, Copy)]
 pub struct Satisfy<F> {
     satisfy_func: F,
@@ -235,15 +249,7 @@ pub struct Many<P, R> {
     pub(crate) parser: P,
     pub(crate) output: PhantomData<R>,
 }
-impl<P, R> Copy for Many<P, R> where P: Parser {}
-impl<P, R> Clone for Many<P, R>
-where
-    P: Parser,
-{
-    fn clone(&self) -> Self {
-        *self
-    }
-}
+impl_copy_and_clone!(Many<P;R>);
 impl<P, R> Parser for Many<P, R>
 where
     P: Parser,
@@ -271,15 +277,7 @@ pub struct Many1<P, R> {
     pub(crate) parser: P,
     pub(crate) output: PhantomData<R>,
 }
-impl<P, R> Copy for Many1<P, R> where P: Parser {}
-impl<P, R> Clone for Many1<P, R>
-where
-    P: Parser,
-{
-    fn clone(&self) -> Self {
-        *self
-    }
-}
+impl_copy_and_clone!(Many1<P;R>);
 impl<P, R> Parser for Many1<P, R>
 where
     P: Parser,
@@ -303,6 +301,31 @@ where
     Many1 {
         parser: parser,
         output: PhantomData,
+    }
+}
+
+pub struct SepBy<P1, P2, R> {
+    pub(crate) parser: P1,
+    pub(crate) sep: P2,
+    pub(crate) output: PhantomData<R>,
+}
+impl_copy_and_clone!(SepBy<P1,P2;R>);
+impl<P1, P2, R> Parser for SepBy<P1, P2, R>
+where
+    P1: Parser,
+    P2: Parser,
+    R: Extend<P1::ParseResult> + Default,
+{
+    type ParseResult = R;
+    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+        let mut collection = R::default();
+        let mut iter = self.parser.iter(buf);
+        let first = iter.next().ok_or(ParseError)?;
+        collection.extend_one(first);
+        let sep = self.sep.with(self.parser);
+        let iter = sep.iter(buf);
+        collection.extend(iter);
+        Ok(collection)
     }
 }
 

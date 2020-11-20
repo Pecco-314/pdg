@@ -27,7 +27,7 @@ pub enum Gen {
     RandomIntegerNoGreaterThan(i64),
     Array(usize, Vec<Token>),
     TestCase(usize, Vec<Token>),
-    RandomPair(i64, i64, i64, i64, Op),
+    RandomIntegerPair(i64, i64, i64, i64, Op),
     RandomString(RandomString),
 }
 #[derive(Copy, Clone, Debug)]
@@ -42,6 +42,14 @@ pub enum Token {
     Gen(Gen),
     Op(Op),
 }
+#[derive(Clone, Debug)]
+pub enum Parameter {
+    Int(i64),
+    Size(usize),
+    Enum(String),
+    Char(char),
+}
+
 fn cul(a: &Gen, b: &Gen, op: &Op) -> Option<Gen> {
     let (l1, r1) = match a {
         RandomIntegerBetween(l, r) => (*l, *r),
@@ -53,7 +61,7 @@ fn cul(a: &Gen, b: &Gen, op: &Op) -> Option<Gen> {
         RandomIntegerNoGreaterThan(r) => (0, *r),
         _ => return None,
     };
-    Some(RandomPair(l1, r1, l2, r2, *op))
+    Some(RandomIntegerPair(l1, r1, l2, r2, *op))
 }
 pub fn cul_token(tokens: &Vec<Token>) -> Option<Vec<Gen>> {
     let mut gens = Vec::new();
@@ -100,7 +108,7 @@ impl Gen {
             TestCase(times, v) => {
                 Some(times.to_string().with('\n') + Array(*times, v.clone()).generate()?.as_str())
             }
-            RandomPair(l1, r1, l2, r2, op) => {
+            RandomIntegerPair(l1, r1, l2, r2, op) => {
                 let (a, b) = random_pair(*l1, *r1, *l2, *r2, *op);
                 let mut s = a.to_string().with(' ');
                 s.push_str(&b.to_string());

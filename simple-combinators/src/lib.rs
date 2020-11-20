@@ -83,6 +83,13 @@ pub trait Parser: Copy + Clone {
             output: PhantomData,
         }
     }
+    fn sep_by<P, R>(self, sep: P) -> SepBy<Self, P, R> {
+        SepBy {
+            parser: self,
+            sep: sep,
+            output: PhantomData,
+        }
+    }
     fn or<P>(self, other: P) -> Or<Self, P> {
         Or {
             parser1: self,
