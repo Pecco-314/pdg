@@ -37,13 +37,13 @@ fn parse_once(buf: &mut &str, is_first: bool) -> (Range<usize>, Vec<Token>, bool
     (range, tokens, end)
 }
 
-fn parse_and_generate(mut buf: &str, fold: PathBuf) {
+fn parse_and_generate(mut buf: &str, fold: PathBuf, config: &Config) {
     let mut is_first = true;
     loop {
         let (range, tokens, end) = parse_once(&mut buf, is_first);
         is_first = false;
         for i in range {
-            generate(i, &tokens, &fold);
+            generate(i, &tokens, &fold, config);
         }
         if end {
             break;
@@ -52,9 +52,14 @@ fn parse_and_generate(mut buf: &str, fold: PathBuf) {
     println!("Finished!");
 }
 
-fn generate(fileid: usize, tokens: &Vec<Token>, fold: &PathBuf) {
-    println!("Generating {}.in", fileid);
-    let target = fold.join(&fileid.to_string().with_str(".in"));
+fn generate(fileid: usize, tokens: &Vec<Token>, fold: &PathBuf, config: &Config) {
+    let prefix = if let Some(prefix) = &config.prefix {
+        prefix
+    } else {
+        ""
+    };
+    println!("Generating {}{}.in", prefix, fileid);
+    let target = fold.join(format!("{}{}.in", prefix, fileid));
     let gens = cul_token(&tokens).expect("Something went wrong while culculating tokens");
     let mut s = String::new();
     for i in gens.iter() {
@@ -97,7 +102,7 @@ fn main() {
     let mut buf = template.as_str();
     let config = config().parse(&mut buf).unwrap(); // 解析配置
     let fold = get_fold(&path, &config);
-    parse_and_generate(buf, fold);
+    parse_and_generate(buf, fold, &config);
     if let Some(true) | None = config.pause {
         pause();
     }

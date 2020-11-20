@@ -9,12 +9,14 @@ use Parameter::*;
 pub enum ConfigItem {
     Fold(String),
     Pause(bool),
+    Prefix(String),
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     pub fold: Option<String>,
     pub pause: Option<bool>,
+    pub prefix: Option<String>,
 }
 
 #[derive(Clone, Debug)]
