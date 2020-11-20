@@ -1,10 +1,6 @@
 use crate::token::*;
 use num::cast::ToPrimitive;
-use simple_combinators::{
-    combinator::{many1, optional},
-    parser::*,
-    ParseError, Parser,
-};
+use simple_combinators::{combinator::optional, parser::*, ParseError, Parser};
 use std::ops::Range;
 use Parameter::*;
 use RandomString::*;
@@ -25,11 +21,10 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
 
 fn parameter() -> impl Parser<ParseResult = Parameter> {
     number()
-        .map(|i| Parameter::Int(i))
-        .or(many1(alpha()).map(|s| Parameter::Enum(s)))
-        .or(any()
-            .between(char('\''), char('\''))
-            .map(|c| Parameter::Char(c)))
+        .map(|i| Int(i))
+        .or(word().map(|e| Enum(e)))
+        .or(quoted_string().map(|s| Str(s)))
+        .or(any().between(char('\''), char('\'')).map(|c| Char(c)))
 }
 
 fn parameters() -> impl Parser<ParseResult = Vec<Parameter>> {
@@ -75,6 +70,45 @@ fn random_integer_token() -> impl Parser<ParseResult = Token> {
 fn random_string_token() -> impl Parser<ParseResult = Token> {
     char('s').with(parameters()).flat_map(|v| match &v[..] {
         [Int(a)] => Ok(Gen(RandomString(Lower(a.to_usize().ok_or(ParseError)?)))),
+        [Enum(e), Int(a)] if e == "lower" => {
+            Ok(Gen(RandomString(Lower(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Int(a)] if e == "upper" => {
+            Ok(Gen(RandomString(Upper(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Int(a)] if e == "alpha" => {
+            Ok(Gen(RandomString(Alpha(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Int(a)] if e == "bin" => {
+            Ok(Gen(RandomString(Bin(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Int(a)] if e == "oct" => {
+            Ok(Gen(RandomString(Oct(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Int(a)] if e == "dec" => {
+            Ok(Gen(RandomString(Dec(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Int(a)] if e == "hexlower" => {
+            Ok(Gen(RandomString(HexLower(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Int(a)] if e == "hexupper" => {
+            Ok(Gen(RandomString(HexUpper(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Int(a)] if e == "alnum" => {
+            Ok(Gen(RandomString(Alnum(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Int(a)] if e == "graph" => {
+            Ok(Gen(RandomString(Graph(a.to_usize().ok_or(ParseError)?))))
+        }
+        [Enum(e), Str(s), Int(a)] if e == "oneof" => Ok(Gen(RandomString(OneOf(
+            s.clone(),
+            a.to_usize().ok_or(ParseError)?,
+        )))),
+        [Enum(e), Char(l), Char(r), Int(a)] if e == "between" => Ok(Gen(RandomString(Between(
+            *l,
+            *r,
+            a.to_usize().ok_or(ParseError)?,
+        )))),
         _ => Err(ParseError),
     })
 }

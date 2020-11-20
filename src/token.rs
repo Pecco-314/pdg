@@ -17,8 +17,8 @@ pub enum RandomString {
     HexUpper(usize),
     Alnum(usize),
     Graph(usize),
-    OneOf(usize, String),
-    Within(usize, char, char),
+    OneOf(String, usize),
+    Between(char, char, usize),
 }
 #[derive(Clone, Debug)]
 pub enum Gen {

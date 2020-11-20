@@ -59,7 +59,7 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
     use RandomString::*;
     let mut s = String::new();
     match rs {
-        OneOf(times, dict) => {
+        OneOf(dict, times) => {
             let dict: Vec<char> = dict.chars().collect();
             for _ in 0..*times {
                 s.push(*dict[..].choose(&mut thread_rng())?);
@@ -94,17 +94,17 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
             }
             Some(s)
         }
-        Within(times, l, r) => {
+        Between(l, r, times) => {
             for _ in 0..*times {
                 s.push(random_char(*l, *r)?);
             }
             Some(s)
         }
-        Lower(times) => random_string(&Within(*times, 'a', 'z')),
-        Upper(times) => random_string(&Within(*times, 'A', 'Z')),
-        Bin(times) => random_string(&Within(*times, '0', '1')),
-        Oct(times) => random_string(&Within(*times, '0', '7')),
-        Dec(times) => random_string(&Within(*times, '0', '9')),
-        Graph(times) => random_string(&Within(*times, '!', '~')),
+        Lower(times) => random_string(&Between('a', 'z', *times)),
+        Upper(times) => random_string(&Between('A', 'Z', *times)),
+        Bin(times) => random_string(&Between('0', '1', *times)),
+        Oct(times) => random_string(&Between('0', '7', *times)),
+        Dec(times) => random_string(&Between('0', '9', *times)),
+        Graph(times) => random_string(&Between('!', '~', *times)),
     }
 }
