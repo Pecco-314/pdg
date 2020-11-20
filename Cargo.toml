@@ -10,3 +10,4 @@ include = ["example/*/template.txt"]
 [dependencies]
 "simple-combinators" = { version = "0.1", path="simple-combinators"}
 "rand" = "^0.7"
+"num" = "^0.3"

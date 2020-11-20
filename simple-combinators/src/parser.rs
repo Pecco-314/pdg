@@ -94,9 +94,9 @@ pub fn word() -> impl Parser<ParseResult = String> {
 pub fn quoted_string() -> impl Parser<ParseResult = String> {
     many1(
         (string("\\\"").map(|_| '\"'))
-            .or(string("\\\n").map(|_| '\n'))
-            .or(string("\\\r").map(|_| '\r'))
-            .or(string("\\\t").map(|_| '\t'))
+            .or(string("\\n").map(|_| '\n'))
+            .or(string("\\r").map(|_| '\r'))
+            .or(string("\\t").map(|_| '\t'))
             .or(string("\\\\").map(|_| '\\'))
             .or(satisfy(|c| c != '"')),
     )

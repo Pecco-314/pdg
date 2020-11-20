@@ -49,6 +49,7 @@ fn main() {
         };
         is_first = false;
         let tokens: Vec<Token> = token().iter(&mut buf).collect();
+        println!("{:?}", tokens);
         for i in range {
             println!("Generating {}.in", i);
             let target_path = parent_path.join(&i.to_string().with_str(".in"));
@@ -56,7 +57,7 @@ fn main() {
             let mut s = String::new();
             for i in gens.iter() {
                 s.push_str(
-                    &i.generate()
+                    &i.generate_str()
                         .expect("Something went wrong while generating random numbers"),
                 );
             }

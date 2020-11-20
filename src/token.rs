@@ -3,6 +3,7 @@ use crate::random::*;
 use rand::prelude::*;
 pub use Gen::*;
 pub use Op::*;
+use Parameter::*;
 
 #[derive(Clone, Debug)]
 pub enum RandomString {
@@ -23,6 +24,7 @@ pub enum RandomString {
 pub enum Gen {
     NewLine,
     ConstantInteger(i64),
+    ConstantString(String),
     RandomIntegerBetween(i64, i64),
     RandomIntegerNoGreaterThan(i64),
     Array(usize, Vec<Token>),
@@ -85,36 +87,42 @@ pub fn cul_token(tokens: &Vec<Token>) -> Option<Vec<Gen>> {
     Some(gens)
 }
 impl Gen {
-    pub fn generate(&self) -> Option<String> {
+    pub fn generate(&self) -> Option<Parameter> {
         match self {
-            NewLine => Some('\n'.to_string()),
-            ConstantInteger(a) => Some(a.to_string().with(' ')),
-            RandomIntegerBetween(a, b) => {
-                Some(thread_rng().gen_range(*a, *b + 1).to_string().with(' '))
-            }
-            RandomIntegerNoGreaterThan(a) => {
-                Some(thread_rng().gen_range(0, *a + 1).to_string().with(' '))
-            }
+            NewLine => Some(Char('\n')),
+            ConstantString(s) => Some(Str(s.clone())),
+            ConstantInteger(a) => Some(Int(*a)),
+            RandomIntegerBetween(a, b) => Some(Int(thread_rng().gen_range(*a, *b + 1))),
+            RandomIntegerNoGreaterThan(a) => Some(Int(thread_rng().gen_range(0, *a + 1))),
             Array(times, v) => {
                 let mut s = String::new();
                 let mut gens = cul_token(v)?;
                 for _ in 0..*times {
                     for i in gens.iter_mut() {
-                        s.push_str(&i.generate()?);
+                        s.push_str(&i.generate_str()?);
                     }
                 }
-                Some(s)
+                Some(Str(s))
             }
             TestCase(times, v) => {
-                Some(times.to_string().with('\n') + Array(*times, v.clone()).generate()?.as_str())
+                Some(Str(times.to_string().with('\n')
+                    + Array(*times, v.clone()).generate_str()?.as_str()))
             }
             RandomIntegerPair(l1, r1, l2, r2, op) => {
                 let (a, b) = random_pair(*l1, *r1, *l2, *r2, *op);
                 let mut s = a.to_string().with(' ');
                 s.push_str(&b.to_string());
-                Some(s.with(' '))
+                Some(Str(s.with(' ')))
             }
-            RandomString(rs) => random_string(&rs),
+            RandomString(rs) => Some(Str(random_string(&rs)?)),
+        }
+    }
+    pub fn generate_str(&self) -> Option<String> {
+        match self.generate()? {
+            Int(i) => Some(i.to_string().with(' ')),
+            Char(c) => Some(c.to_string()),
+            Str(s) => Some(s),
+            _ => None,
         }
     }
 }

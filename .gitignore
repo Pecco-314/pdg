@@ -3,3 +3,5 @@
 Cargo.lock
 *.in
 *.out
+/testdata
+template.txt
