@@ -6,14 +6,31 @@ pub mod parser;
 use combinator::*;
 use derive_more::{Display, Error};
 use std::marker::PhantomData;
-use std::option::NoneError;
 
 #[derive(Debug, Display, Error)]
-pub struct ParseError;
-impl From<NoneError> for ParseError {
-    fn from(_: NoneError) -> ParseError {
-        ParseError
+pub struct ParseError<'a> {
+    pub position: &'a str,
+}
+pub trait IntoParseError<T> {
+    fn into_if_err<'a>(self, err: ParseError<'a>) -> Result<T, ParseError<'a>>;
+}
+impl<T> IntoParseError<T> for Option<T> {
+    fn into_if_err<'a>(self, err: ParseError<'a>) -> Result<T, ParseError<'a>> {
+        self.ok_or_else(|| err)
     }
+}
+impl<T, E> IntoParseError<T> for Result<T, E> {
+    fn into_if_err<'a>(self, err: ParseError<'a>) -> Result<T, ParseError<'a>> {
+        self.map_err(|_| err)
+    }
+}
+pub fn slice_some(buf: &str) -> &str {
+    let end = buf.char_indices().map(|(i, _)| i).take(20).last();
+    let end = match end {
+        None => 0,
+        Some(x) => x,
+    };
+    &buf[..end]
 }
 
 pub struct ParserIter<'a, 'b, P> {
@@ -32,7 +49,7 @@ where
 
 pub trait Parser: Copy + Clone {
     type ParseResult;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError>;
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>>;
     fn iter<'a, 'b>(&'a self, buf: &'a mut &'b str) -> ParserIter<'a, 'b, Self> {
         ParserIter {
             parser: self,
@@ -74,13 +91,14 @@ pub trait Parser: Copy + Clone {
             callback: callback,
         }
     }
-    fn flat_map<F, R, E>(self, callback: F) -> FlatMap<Self, F>
+    fn flat_map<F, R, E>(self, callback: F) -> FlatMap<Self, F, R>
     where
-        F: Fn(Self::ParseResult) -> Result<R, E>,
+        F: Fn(Self::ParseResult) -> E + Copy,
     {
         FlatMap {
             parser: self,
             callback: callback,
+            mark: PhantomData,
         }
     }
     fn repeat<P>(self, times: usize) -> Repeat<Self, P> {

@@ -8,11 +8,12 @@ use crate::{
     token::{cul_token, Config, Token},
 };
 use powershell_script;
-use simple_combinators::Parser;
+use simple_combinators::{ParseError, Parser};
 use std::{
     env, fs, io,
     ops::Range,
     path::{Path, PathBuf},
+    process::exit,
 };
 
 fn pause() {
@@ -33,9 +34,17 @@ fn parse_once(buf: &mut &str, is_first: bool) -> (Range<usize>, Vec<Token>, bool
             } else {
                 1..1
             }
-        } // 如果尚未生成过，则默认生成1.in~10.in
+        } // 没有发现文件标注，如果尚未生成过，则默认生成1.in~10.in
     };
     let tokens = token().iter(buf).collect();
+    let next_parse_result = token().parse(buf);
+    match next_parse_result {
+        Err(ParseError { position: pos }) if !pos.is_empty() => {
+            println!("Something went wrong while parsing \"...{}...\"", pos);
+            exit(1);
+        }
+        _ => {}
+    }
     (range, tokens, end)
 }
 

@@ -3,7 +3,7 @@ use crate::{
     token::{ConfigItem::*, Gen::*, Parameter::*, RandomString::*, Token::*, *},
 };
 use num::cast::ToPrimitive;
-use simple_combinators::{combinator::optional, parser::*, ParseError, Parser};
+use simple_combinators::{combinator::optional, parser::*, slice_some, ParseError, Parser};
 use std::ops::Range;
 
 pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
@@ -13,26 +13,26 @@ pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
             string("#fold")
                 .with(parameters())
                 .flat_map(|v| match &v[..] {
-                    [Str(s)] => Ok(Fold(resolve!(s, str))),
-                    _ => Err(ParseError),
+                    [Str(s)] => Some(Fold(resolve!(s, str))),
+                    _ => None,
                 })
                 .or(string("#pause")
                     .with(parameters())
                     .flat_map(|v| match &v[..] {
-                        [Bool(b)] => Ok(Pause(*b)),
-                        _ => Err(ParseError),
+                        [Bool(b)] => Some(Pause(*b)),
+                        _ => None,
                     }))
                 .or(string("#std")
                     .with(parameters())
                     .flat_map(|v| match &v[..] {
-                        [Str(s)] => Ok(Std(resolve!(s, str))),
-                        _ => Err(ParseError),
+                        [Str(s)] => Some(Std(resolve!(s, str))),
+                        _ => None,
                     }))
                 .or(string("#prefix")
                     .with(parameters())
                     .flat_map(|v| match &v[..] {
-                        [Str(s)] => Ok(Prefix(resolve!(s, str))),
-                        _ => Err(ParseError),
+                        [Str(s)] => Some(Prefix(resolve!(s, str))),
+                        _ => None,
                     })),
         )
         .skip(spaces())
@@ -41,7 +41,7 @@ pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
 struct ConfigParser;
 impl Parser for ConfigParser {
     type ParseResult = Config;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let mut config = Config {
             ..Default::default()
         };
@@ -87,14 +87,14 @@ fn int_parameter() -> impl Parser<ParseResult = Parameter> {
         .map(|i| Int(Confirm(i)))
         .or(
             char('!').with(random_integer_token().flat_map(|token| match token {
-                Gen(gen) => Ok(gen.generate().ok_or(ParseError)?),
-                _ => Err(ParseError),
+                Gen(gen) => Some(gen.generate()?),
+                _ => None,
             })),
         )
         .or(
             char('?').with(random_integer_token().flat_map(|token| match token {
-                Gen(gen) => Ok(Int(Lazy(Box::new(gen)))),
-                _ => Err(ParseError),
+                Gen(gen) => Some(Int(Lazy(Box::new(gen)))),
+                _ => None,
             })),
         )
 }
@@ -105,14 +105,14 @@ fn str_parameter() -> impl Parser<ParseResult = Parameter> {
         .map(|s| Str(Confirm(s)))
         .or(
             char('!').with(random_string_token().flat_map(|token| match token {
-                Gen(gen) => Ok(gen.generate().ok_or(ParseError)?),
-                _ => Err(ParseError),
+                Gen(gen) => Some(gen.generate()?),
+                _ => None,
             })),
         )
         .or(
             char('?').with(random_string_token().flat_map(|token| match token {
-                Gen(gen) => Ok(Str(Lazy(Box::new(gen)))),
-                _ => Err(ParseError),
+                Gen(gen) => Some(Str(Lazy(Box::new(gen)))),
+                _ => None,
             })),
         )
 }
@@ -121,7 +121,7 @@ fn str_parameter() -> impl Parser<ParseResult = Parameter> {
 struct ParameterParser;
 impl Parser for ParameterParser {
     type ParseResult = Parameter;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         int_parameter()
             .or(str_parameter())
             .or(any().between(char('\''), char('\'')).map(|c| Char(c)))
@@ -146,7 +146,7 @@ fn parameters() -> impl Parser<ParseResult = Vec<Parameter>> {
 struct Repeated;
 impl Parser for Repeated {
     type ParseResult = Vec<Token>;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let res = spaces().skip(char('{')).parse(buf);
         let mut v = Vec::new();
         match res {
@@ -157,7 +157,15 @@ impl Parser for Repeated {
                 spaces().skip(char('}')).parse(buf)?;
             }
             Err(_) => {
-                v.push(token().iter(buf).next().ok_or(ParseError)?.clone());
+                v.push(
+                    token()
+                        .iter(buf)
+                        .next()
+                        .ok_or(ParseError {
+                            position: slice_some(buf),
+                        })?
+                        .clone(),
+                );
             }
         };
         Ok(v)
@@ -170,32 +178,32 @@ fn repeated() -> impl Parser<ParseResult = Vec<Token>> {
 fn random_integer_token() -> impl Parser<ParseResult = Token> {
     use crate::token::RandomInteger::*;
     char('i').with(parameters()).flat_map(|v| match &v[..] {
-        [Int(a)] => Ok(Gen(RandomInteger(NoGreaterThan(a.clone())))),
-        [Int(a), Int(b)] => Ok(Gen(RandomInteger(Between(a.clone(), b.clone())))),
-        _ => Err(ParseError),
+        [Int(a)] => Some(Gen(RandomInteger(NoGreaterThan(a.clone())))),
+        [Int(a), Int(b)] => Some(Gen(RandomInteger(Between(a.clone(), b.clone())))),
+        _ => None,
     })
 }
 
 fn random_string_token() -> impl Parser<ParseResult = Token> {
     char('s').with(parameters()).flat_map(|v| match &v[..] {
-        [Int(t)] => Ok(Gen(RandomString(Lower(t.clone())))),
-        [Enum(e), Int(t)] if e == "lower" => Ok(Gen(RandomString(Lower(t.clone())))),
-        [Enum(e), Int(t)] if e == "upper" => Ok(Gen(RandomString(Upper(t.clone())))),
-        [Enum(e), Int(t)] if e == "alpha" => Ok(Gen(RandomString(Alpha(t.clone())))),
-        [Enum(e), Int(t)] if e == "bin" => Ok(Gen(RandomString(Bin(t.clone())))),
-        [Enum(e), Int(t)] if e == "oct" => Ok(Gen(RandomString(Oct(t.clone())))),
-        [Enum(e), Int(t)] if e == "dec" => Ok(Gen(RandomString(Dec(t.clone())))),
-        [Enum(e), Int(t)] if e == "hexlower" => Ok(Gen(RandomString(HexLower(t.clone())))),
-        [Enum(e), Int(t)] if e == "hexupper" => Ok(Gen(RandomString(HexUpper(t.clone())))),
-        [Enum(e), Int(t)] if e == "alnum" => Ok(Gen(RandomString(Alnum(t.clone())))),
-        [Enum(e), Int(t)] if e == "graph" => Ok(Gen(RandomString(Graph(t.clone())))),
+        [Int(t)] => Some(Gen(RandomString(Lower(t.clone())))),
+        [Enum(e), Int(t)] if e == "lower" => Some(Gen(RandomString(Lower(t.clone())))),
+        [Enum(e), Int(t)] if e == "upper" => Some(Gen(RandomString(Upper(t.clone())))),
+        [Enum(e), Int(t)] if e == "alpha" => Some(Gen(RandomString(Alpha(t.clone())))),
+        [Enum(e), Int(t)] if e == "bin" => Some(Gen(RandomString(Bin(t.clone())))),
+        [Enum(e), Int(t)] if e == "oct" => Some(Gen(RandomString(Oct(t.clone())))),
+        [Enum(e), Int(t)] if e == "dec" => Some(Gen(RandomString(Dec(t.clone())))),
+        [Enum(e), Int(t)] if e == "hexlower" => Some(Gen(RandomString(HexLower(t.clone())))),
+        [Enum(e), Int(t)] if e == "hexupper" => Some(Gen(RandomString(HexUpper(t.clone())))),
+        [Enum(e), Int(t)] if e == "alnum" => Some(Gen(RandomString(Alnum(t.clone())))),
+        [Enum(e), Int(t)] if e == "graph" => Some(Gen(RandomString(Graph(t.clone())))),
         [Enum(e), Str(s), Int(t)] if e == "oneof" => {
-            Ok(Gen(RandomString(OneOf(s.clone(), t.clone()))))
+            Some(Gen(RandomString(OneOf(s.clone(), t.clone()))))
         }
         [Enum(e), Char(l), Char(r), Int(t)] if e == "between" => {
-            Ok(Gen(RandomString(Between(*l, *r, t.clone()))))
+            Some(Gen(RandomString(Between(*l, *r, t.clone()))))
         }
-        _ => Err(ParseError),
+        _ => None,
     })
 }
 
@@ -203,8 +211,8 @@ fn repeated_token() -> impl Parser<ParseResult = Token> {
     char('X')
         .with(parameters())
         .flat_map(|v| match &v[..] {
-            [Int(IntParameter::Confirm(a))] => Ok(a.to_usize()?),
-            _ => Err(ParseError),
+            [Int(IntParameter::Confirm(a))] => Some(a.to_usize()?),
+            _ => None,
         })
         .and(repeated())
         .map(|(times, v)| Gen(Repeat(times, v)))
@@ -214,8 +222,8 @@ fn array_token() -> impl Parser<ParseResult = Token> {
     char('A')
         .with(parameters())
         .flat_map(|v| match &v[..] {
-            [Int(IntParameter::Confirm(a))] => Ok(a.to_usize()?),
-            _ => Err(ParseError),
+            [Int(IntParameter::Confirm(a))] => Some(a.to_usize()?),
+            _ => None,
         })
         .and(repeated())
         .map(|(times, v)| Gen(Array(times, v)))

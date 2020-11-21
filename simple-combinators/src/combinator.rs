@@ -1,5 +1,4 @@
-use super::{ParseError, Parser};
-use std::error::Error;
+use crate::{slice_some, IntoParseError, ParseError, Parser};
 use std::marker::PhantomData;
 
 macro_rules! impl_copy_and_clone {
@@ -26,12 +25,16 @@ where
     F: Fn(char) -> bool + Copy,
 {
     type ParseResult = char;
-    fn parse(&self, buf: &mut &str) -> Result<char, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let mut iter = buf.chars();
-        let first = iter.next().ok_or(ParseError)?;
+        let first = iter.next().ok_or(ParseError {
+            position: slice_some(buf),
+        })?;
         let res = (self.satisfy_func)(first)
             .then_some(first)
-            .ok_or(ParseError)?;
+            .ok_or(ParseError {
+                position: slice_some(buf),
+            })?;
         *buf = iter.as_str();
         Ok(res)
     }
@@ -53,7 +56,7 @@ where
     P2: Parser,
 {
     type ParseResult = P2::ParseResult;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         self.parser1.parse(buf)?;
         let res = self.parser2.parse(buf)?;
         Ok(res)
@@ -72,7 +75,7 @@ where
     P2: Parser,
 {
     type ParseResult = P1::ParseResult;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let res = self.parser1.parse(buf)?;
         self.parser2.parse(buf)?;
         Ok(res)
@@ -91,7 +94,7 @@ where
     P2: Parser,
 {
     type ParseResult = (P1::ParseResult, P2::ParseResult);
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let res1 = self.parser1.parse(buf)?;
         let res2 = self.parser2.parse(buf)?;
         Ok((res1, res2))
@@ -109,27 +112,30 @@ where
     F: Fn(P::ParseResult) -> R + Copy,
 {
     type ParseResult = R;
-    fn parse(&self, buf: &mut &str) -> Result<R, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let raw = self.parser.parse(buf)?;
         Ok((self.callback)(raw))
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct FlatMap<P, F> {
+pub struct FlatMap<P, F, R> {
     pub(crate) parser: P,
     pub(crate) callback: F,
+    pub(crate) mark: PhantomData<R>,
 }
-impl<P, F, R, E> Parser for FlatMap<P, F>
+impl_copy_and_clone!(FlatMap<P,F;R>);
+impl<P, F, R, E> Parser for FlatMap<P, F, R>
 where
     P: Parser,
-    F: Fn(P::ParseResult) -> Result<R, E> + Copy,
-    E: Error,
+    F: Fn(P::ParseResult) -> E + Copy,
+    E: IntoParseError<R>,
 {
     type ParseResult = R;
-    fn parse(&self, buf: &mut &str) -> Result<R, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let raw = self.parser.parse(buf)?;
-        let res = (self.callback)(raw).map_err(|_| ParseError)?;
+        let res = (self.callback)(raw).into_if_err(ParseError {
+            position: slice_some(buf),
+        })?;
         Ok(res)
     }
 }
@@ -143,7 +149,7 @@ where
     P: Parser,
 {
     type ParseResult = P::ParseResult;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let backup = *buf;
         let res = self.parser.parse(buf);
         if res.is_err() {
@@ -168,7 +174,7 @@ where
     P: Parser,
 {
     type ParseResult = Option<P::ParseResult>;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let backup = *buf;
         let res = self.parser.parse(buf);
         if res.is_err() {
@@ -193,7 +199,7 @@ where
     P: Parser,
 {
     type ParseResult = P::ParseResult;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let backup = *buf;
         let res = self.parser.parse(buf);
         *buf = backup;
@@ -234,11 +240,14 @@ where
     R: Extend<P::ParseResult> + Default,
 {
     type ParseResult = R;
-    fn parse(&self, buf: &mut &str) -> Result<R, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+        let backup = *buf;
         let mut iter = self.parser.iter(buf);
         let mut collection = R::default();
         for _ in 0..self.times {
-            let cur = iter.next().ok_or(ParseError)?;
+            let cur = iter.next().ok_or(ParseError {
+                position: slice_some(backup),
+            })?;
             collection.extend_one(cur);
         }
         Ok(collection)
@@ -256,7 +265,7 @@ where
     R: Extend<P::ParseResult> + Default,
 {
     type ParseResult = R;
-    fn parse(&self, buf: &mut &str) -> Result<R, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let mut collection = R::default();
         collection.extend(self.parser.iter(buf));
         Ok(collection)
@@ -284,10 +293,13 @@ where
     R: Extend<P::ParseResult> + Default,
 {
     type ParseResult = R;
-    fn parse(&self, buf: &mut &str) -> Result<R, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let mut collection = R::default();
+        let backup = *buf;
         let mut iter = self.parser.iter(buf);
-        let first = iter.next().ok_or(ParseError)?;
+        let first = iter.next().ok_or(ParseError {
+            position: slice_some(backup),
+        })?;
         collection.extend_one(first);
         collection.extend(iter);
         Ok(collection)
@@ -317,10 +329,12 @@ where
     R: Extend<P1::ParseResult> + Default,
 {
     type ParseResult = R;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let mut collection = R::default();
         let mut iter = self.parser.iter(buf);
-        let first = iter.next().ok_or(ParseError)?;
+        let first = iter.next().ok_or(ParseError {
+            position: slice_some(buf),
+        })?;
         collection.extend_one(first);
         let sep = attempt(self.sep.with(self.parser));
         let iter = sep.iter(buf);
@@ -340,7 +354,7 @@ where
     P2: Parser<ParseResult = R>,
 {
     type ParseResult = R;
-    fn parse(&self, buf: &mut &str) -> Result<R, ParseError> {
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         let res = attempt(self.parser1).parse(buf);
         if res.is_ok() {
             res

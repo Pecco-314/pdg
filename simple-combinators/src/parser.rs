@@ -1,5 +1,5 @@
 use crate::combinator::*;
-use crate::{ParseError, Parser};
+use crate::{slice_some, ParseError, Parser};
 use num::traits::FromPrimitive;
 use std::error::Error;
 use std::str::FromStr;
@@ -52,14 +52,7 @@ where
 {
     const EPS: f64 = 1e-10;
     float()
-        .flat_map(|x| {
-            if (x - x.trunc()).abs() < EPS {
-                // 小数部分足够小则解析成功
-                I::from_f64(x).ok_or(ParseError)
-            } else {
-                Err(ParseError)
-            }
-        })
+        .flat_map(|x| (x - x.trunc().abs() < EPS).then_some(I::from_f64(x)?)) // 小数部分足够小则解析成功
         .or(many1(one_of("-0123456789")).flat_map(|s: String| s.parse::<I>())) // 解析失败则尝试只解析数字和负号
         .or(many1(one_of("0123456789")).flat_map(|s: String| s.parse::<I>())) // 再解析失败则尝试只解析数字
 }
@@ -70,13 +63,15 @@ pub struct Str<'a> {
 }
 impl<'a> Parser for Str<'a> {
     type ParseResult = &'a str;
-    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let len = self.string.len();
         if buf.len() >= len && &buf[..len] == self.string {
             *buf = &buf[len..];
             Ok(self.string)
         } else {
-            Err(ParseError)
+            Err(ParseError {
+                position: slice_some(buf),
+            })
         }
     }
 }

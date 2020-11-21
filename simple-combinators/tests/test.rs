@@ -100,12 +100,7 @@ mod tests {
                 .parse(&mut "a"),
             'A'
         );
-        assert_ok!(
-            digit()
-                .flat_map(|c| c.to_digit(10).ok_or(ParseError))
-                .parse(&mut "1"),
-            1
-        );
+        assert_ok!(digit().flat_map(|c| c.to_digit(10)).parse(&mut "1"), 1);
     }
     #[test]
     fn test_iter() {
@@ -116,7 +111,7 @@ mod tests {
         assert_eq!(v, vec!['t', 'e', 's', 't']);
         let mut ans = 0;
         for i in digit()
-            .flat_map(|c| c.to_digit(10).ok_or(ParseError))
+            .flat_map(|c| c.to_digit(10).ok_or(()))
             .iter(&mut "1234")
         {
             ans = ans * 10 + i;
