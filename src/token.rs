@@ -1,7 +1,8 @@
-use self::{Gen::*, IntParameter::*, Parameter::*};
 use crate::{
     details::With,
     random::{random_pair, random_string},
+    resolve,
+    token::{Gen::*, IntParameter::*, Parameter::*},
 };
 use rand::prelude::{thread_rng, Rng};
 
@@ -35,16 +36,20 @@ pub enum RandomString {
     Between(char, char, IntParameter),
 }
 #[derive(Clone, Debug)]
+pub enum RandomInteger {
+    Between(IntParameter, IntParameter),
+    NoGreaterThan(IntParameter),
+}
+#[derive(Clone, Debug)]
 pub enum Gen {
     NewLine,
     ConstantInteger(i64),
     ConstantString(String),
-    RandomIntegerBetween(i64, i64),
-    RandomIntegerNoGreaterThan(i64),
+    RandomInteger(RandomInteger),
+    RandomString(RandomString),
     Repeat(usize, Vec<Token>),
     Array(usize, Vec<Token>),
     RandomIntegerPair(i64, i64, i64, i64, Op),
-    RandomString(RandomString),
 }
 #[derive(Copy, Clone, Debug)]
 pub enum Op {
@@ -82,14 +87,15 @@ pub enum IntParameter {
 }
 
 fn cul(a: &Gen, b: &Gen, op: &Op) -> Option<Gen> {
+    use crate::token::RandomInteger::*;
     let (l1, r1) = match a {
-        RandomIntegerBetween(l, r) => (*l, *r),
-        RandomIntegerNoGreaterThan(r) => (0, *r),
+        RandomInteger(Between(l, r)) => (resolve!(l, int), resolve!(r, int)),
+        RandomInteger(NoGreaterThan(r)) => (0, resolve!(r, int)),
         _ => return None,
     };
     let (l2, r2) = match b {
-        RandomIntegerBetween(l, r) => (*l, *r),
-        RandomIntegerNoGreaterThan(r) => (0, *r),
+        RandomInteger(Between(l, r)) => (resolve!(l, int), resolve!(r, int)),
+        RandomInteger(NoGreaterThan(r)) => (0, resolve!(r, int)),
         _ => return None,
     };
     Some(RandomIntegerPair(l1, r1, l2, r2, *op))
@@ -117,12 +123,17 @@ pub fn cul_token(tokens: &Vec<Token>) -> Option<Vec<Gen>> {
 }
 impl Gen {
     pub fn generate(&self) -> Option<Parameter> {
+        use crate::token::RandomInteger::*;
         match self {
             NewLine => Some(Char('\n')),
             ConstantString(s) => Some(Str(s.clone())),
             ConstantInteger(a) => Some(Int(Confirm(*a))),
-            RandomIntegerBetween(a, b) => Some(Int(Confirm(thread_rng().gen_range(*a, *b + 1)))),
-            RandomIntegerNoGreaterThan(a) => Some(Int(Confirm(thread_rng().gen_range(0, *a + 1)))),
+            RandomInteger(Between(l, r)) => Some(Int(Confirm(
+                thread_rng().gen_range(resolve!(l, int), resolve!(r, int)),
+            ))),
+            RandomInteger(NoGreaterThan(r)) => Some(Int(Confirm(
+                thread_rng().gen_range(0, resolve!(r, int) + 1),
+            ))),
             Repeat(times, v) => {
                 let mut s = String::new();
                 let mut gens = cul_token(v)?;

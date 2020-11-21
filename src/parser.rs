@@ -1,5 +1,5 @@
 use crate::token::{
-    ConfigItem::*, Gen::*, IntParameter::*, Op::*, Parameter::*, RandomString::*, Token::*, *,
+    ConfigItem::*, Gen::*, IntParameter::*, Parameter::*, RandomString::*, Token::*, *,
 };
 use num::cast::ToPrimitive;
 use simple_combinators::{combinator::optional, parser::*, ParseError, Parser};
@@ -149,9 +149,10 @@ fn repeated() -> impl Parser<ParseResult = Vec<Token>> {
 }
 
 fn random_integer_token() -> impl Parser<ParseResult = Token> {
+    use crate::token::RandomInteger::*;
     char('i').with(parameters()).flat_map(|v| match &v[..] {
-        [Int(Confirm(a))] => Ok(Gen(RandomIntegerNoGreaterThan(*a))),
-        [Int(Confirm(a)), Int(Confirm(b))] => Ok(Gen(RandomIntegerBetween(*a, *b))),
+        [Int(a)] => Ok(Gen(RandomInteger(NoGreaterThan(a.clone())))),
+        [Int(a), Int(b)] => Ok(Gen(RandomInteger(Between(a.clone(), b.clone())))),
         _ => Err(ParseError),
     })
 }
@@ -202,6 +203,7 @@ fn array_token() -> impl Parser<ParseResult = Token> {
 }
 
 pub fn cmp_op() -> impl Parser<ParseResult = Token> {
+    use crate::token::Op::*;
     char('<')
         .map(|_| Op(LessThan))
         .or(char('>').map(|_| Op(GreaterThan)))
