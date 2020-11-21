@@ -22,6 +22,12 @@ pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
                         [Bool(b)] => Ok(Pause(*b)),
                         _ => Err(ParseError),
                     }))
+                .or(string("#std")
+                    .with(parameters())
+                    .flat_map(|v| match &v[..] {
+                        [Str(s)] => Ok(Std(resolve!(s, str))),
+                        _ => Err(ParseError),
+                    }))
                 .or(string("#prefix")
                     .with(parameters())
                     .flat_map(|v| match &v[..] {
@@ -49,6 +55,9 @@ impl Parser for ConfigParser {
                 }
                 Prefix(b) => {
                     config.prefix = Some(b);
+                }
+                Std(b) => {
+                    config.std = Some(b);
                 }
             }
         }

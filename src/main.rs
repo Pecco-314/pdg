@@ -3,14 +3,17 @@ mod details;
 mod parser;
 mod random;
 mod token;
-use parser::{config, file_range, token};
+use crate::{
+    parser::{config, file_range, token},
+    token::{cul_token, Config, Token},
+};
+use powershell_script;
 use simple_combinators::Parser;
 use std::{
     env, fs, io,
     ops::Range,
     path::{Path, PathBuf},
 };
-use token::{cul_token, Config, Token};
 
 fn pause() {
     println!("(Press any key to exit)");
@@ -58,8 +61,9 @@ fn generate(fileid: usize, tokens: &Vec<Token>, fold: &PathBuf, config: &Config)
     } else {
         ""
     };
-    println!("Generating {}{}.in", prefix, fileid);
-    let target = fold.join(format!("{}{}.in", prefix, fileid));
+    let filename = format!("{}{}.in", prefix, fileid);
+    println!("Generating {}", filename);
+    let target = fold.join(filename);
     let gens = cul_token(&tokens).expect("Something went wrong while culculating tokens");
     let mut s = String::new();
     for i in gens.iter() {
@@ -68,7 +72,25 @@ fn generate(fileid: usize, tokens: &Vec<Token>, fold: &PathBuf, config: &Config)
                 .expect("Something went wrong while generating random numbers"),
         );
     }
-    fs::write(target, s).expect("Failed to write");
+    fs::write(&target, s).expect("Failed to write");
+    let output = format!("{}{}.out", prefix, fileid);
+    if let Some(std) = &config.std {
+        run_std(&output, &target, std).unwrap();
+    }
+}
+fn run_std(output: &str, target: &PathBuf, std: &str) -> Option<()> {
+    println!("Generating {}", output);
+    powershell_script::run(
+        &format!(
+            "Get-Content {} | {} | Out-File {}",
+            target.to_str()?,
+            std,
+            target.parent()?.join(output).to_str()?,
+        ),
+        false,
+    )
+    .ok()?;
+    Some(())
 }
 
 fn get_template<'a>() -> (PathBuf, String) {

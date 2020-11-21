@@ -11,3 +11,4 @@ include = ["example/*/template.txt"]
 "simple-combinators" = { version = "0.1", path="simple-combinators"}
 "rand" = "^0.7"
 "num" = "^0.3"
+"powershell_script" ="^0.1"
