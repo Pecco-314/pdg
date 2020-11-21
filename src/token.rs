@@ -21,18 +21,18 @@ pub struct Config {
 
 #[derive(Clone, Debug)]
 pub enum RandomString {
-    Lower(usize),
-    Upper(usize),
-    Alpha(usize),
-    Bin(usize),
-    Oct(usize),
-    Dec(usize),
-    HexLower(usize),
-    HexUpper(usize),
-    Alnum(usize),
-    Graph(usize),
-    OneOf(String, usize),
-    Between(char, char, usize),
+    Lower(IntParameter),
+    Upper(IntParameter),
+    Alpha(IntParameter),
+    Bin(IntParameter),
+    Oct(IntParameter),
+    Dec(IntParameter),
+    HexLower(IntParameter),
+    HexUpper(IntParameter),
+    Alnum(IntParameter),
+    Graph(IntParameter),
+    OneOf(String, IntParameter),
+    Between(char, char, IntParameter),
 }
 #[derive(Clone, Debug)]
 pub enum Gen {
@@ -41,8 +41,8 @@ pub enum Gen {
     ConstantString(String),
     RandomIntegerBetween(i64, i64),
     RandomIntegerNoGreaterThan(i64),
+    Repeat(usize, Vec<Token>),
     Array(usize, Vec<Token>),
-    TestCase(usize, Vec<Token>),
     RandomIntegerPair(i64, i64, i64, i64, Op),
     RandomString(RandomString),
 }
@@ -60,12 +60,27 @@ pub enum Token {
 }
 #[derive(Clone, Debug)]
 pub enum Parameter {
-    Int(i64), // Size类型参数当作Int解析再转化
+    Int(IntParameter), // Size类型参数当作Int解析再转化
     Char(char),
     Enum(String),
     Str(String),
     Bool(bool),
 }
+impl Parameter {
+    pub fn int(&self) -> Option<i64> {
+        match self {
+            Int(Confirm(i)) => Some(*i),
+            Int(Lazy(i)) => i.generate()?.int(),
+            _ => None,
+        }
+    }
+}
+#[derive(Clone, Debug)]
+pub enum IntParameter {
+    Confirm(i64),
+    Lazy(Box<Gen>),
+}
+pub use IntParameter::*;
 
 fn cul(a: &Gen, b: &Gen, op: &Op) -> Option<Gen> {
     let (l1, r1) = match a {
@@ -106,10 +121,10 @@ impl Gen {
         match self {
             NewLine => Some(Char('\n')),
             ConstantString(s) => Some(Str(s.clone())),
-            ConstantInteger(a) => Some(Int(*a)),
-            RandomIntegerBetween(a, b) => Some(Int(thread_rng().gen_range(*a, *b + 1))),
-            RandomIntegerNoGreaterThan(a) => Some(Int(thread_rng().gen_range(0, *a + 1))),
-            Array(times, v) => {
+            ConstantInteger(a) => Some(Int(Confirm(*a))),
+            RandomIntegerBetween(a, b) => Some(Int(Confirm(thread_rng().gen_range(*a, *b + 1)))),
+            RandomIntegerNoGreaterThan(a) => Some(Int(Confirm(thread_rng().gen_range(0, *a + 1)))),
+            Repeat(times, v) => {
                 let mut s = String::new();
                 let mut gens = cul_token(v)?;
                 for _ in 0..*times {
@@ -119,9 +134,9 @@ impl Gen {
                 }
                 Some(Str(s))
             }
-            TestCase(times, v) => {
+            Array(times, v) => {
                 Some(Str(times.to_string().with('\n')
-                    + Array(*times, v.clone()).generate_str()?.as_str()))
+                    + Repeat(*times, v.clone()).generate_str()?.as_str()))
             }
             RandomIntegerPair(l1, r1, l2, r2, op) => {
                 let (a, b) = random_pair(*l1, *r1, *l2, *r2, *op);
@@ -134,7 +149,7 @@ impl Gen {
     }
     pub fn generate_str(&self) -> Option<String> {
         match self.generate()? {
-            Int(i) => Some(i.to_string().with(' ')),
+            Int(Confirm(i)) => Some(i.to_string().with(' ')),
             Char(c) => Some(c.to_string()),
             Str(s) => Some(s),
             _ => None,

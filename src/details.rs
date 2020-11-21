@@ -27,3 +27,13 @@ impl Push for String {
     }
 }
 impl With for String {}
+
+#[macro_export]
+macro_rules! resolve {
+    ($t:expr, $ty:ident) => {
+        match $t {
+            Confirm(i) => *i,
+            Lazy(g) => g.generate()?.$ty()?,
+        }
+    };
+}

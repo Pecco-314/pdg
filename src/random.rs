@@ -1,4 +1,5 @@
-use crate::token::*;
+use crate::{resolve, token::*};
+use num::cast::ToPrimitive;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 macro_rules! distribute{
     ($sum:expr; $($freq:expr, $func:expr);+)=>{{
@@ -59,52 +60,52 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
     use RandomString::*;
     let mut s = String::new();
     match rs {
-        OneOf(dict, times) => {
+        OneOf(dict, t) => {
             let dict: Vec<char> = dict.chars().collect();
-            for _ in 0..*times {
+            for _ in 0..resolve!(t, int).to_usize()? {
                 s.push(*dict[..].choose(&mut thread_rng())?);
             }
             Some(s)
         }
-        Alpha(times) => {
-            for _ in 0..*times {
+        Alpha(t) => {
+            for _ in 0..resolve!(t, int).to_usize()? {
                 s.push(
                     distribute!(52; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z'))?,
                 );
             }
             Some(s)
         }
-        Alnum(times) => {
-            for _ in 0..*times {
+        Alnum(t) => {
+            for _ in 0..resolve!(t, int).to_usize()? {
                 s.push(
                     distribute!(62; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z'); 10, || random_char('0','9'))?,
                 );
             }
             Some(s)
         }
-        HexLower(times) => {
-            for _ in 0..*times {
+        HexLower(t) => {
+            for _ in 0..resolve!(t, int).to_usize()? {
                 s.push(distribute!(16; 10, || random_char('0', '9'); 6, || random_char('a', 'f'))?);
             }
             Some(s)
         }
-        HexUpper(times) => {
-            for _ in 0..*times {
+        HexUpper(t) => {
+            for _ in 0..resolve!(t, int).to_usize()? {
                 s.push(distribute!(16; 10, || random_char('0', '9'); 6, || random_char('A', 'F'))?);
             }
             Some(s)
         }
-        Between(l, r, times) => {
-            for _ in 0..*times {
+        Between(l, r, t) => {
+            for _ in 0..resolve!(t, int).to_usize()? {
                 s.push(random_char(*l, *r)?);
             }
             Some(s)
         }
-        Lower(times) => random_string(&Between('a', 'z', *times)),
-        Upper(times) => random_string(&Between('A', 'Z', *times)),
-        Bin(times) => random_string(&Between('0', '1', *times)),
-        Oct(times) => random_string(&Between('0', '7', *times)),
-        Dec(times) => random_string(&Between('0', '9', *times)),
-        Graph(times) => random_string(&Between('!', '~', *times)),
+        Lower(t) => random_string(&Between('a', 'z', t.clone())),
+        Upper(t) => random_string(&Between('A', 'Z', t.clone())),
+        Bin(t) => random_string(&Between('0', '1', t.clone())),
+        Oct(t) => random_string(&Between('0', '7', t.clone())),
+        Dec(t) => random_string(&Between('0', '9', t.clone())),
+        Graph(t) => random_string(&Between('!', '~', t.clone())),
     }
 }

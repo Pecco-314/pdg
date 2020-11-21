@@ -74,10 +74,16 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
 
 fn int_parameter() -> impl Parser<ParseResult = Parameter> {
     number()
-        .map(|i| Int(i))
+        .map(|i| Int(Confirm(i)))
         .or(
             char('!').with(random_integer_token().flat_map(|token| match token {
                 Gen(gen) => Ok(gen.generate().ok_or(ParseError)?),
+                _ => Err(ParseError),
+            })),
+        )
+        .or(
+            char('?').with(random_integer_token().flat_map(|token| match token {
+                Gen(gen) => Ok(Int(Lazy(Box::new(gen)))),
                 _ => Err(ParseError),
             })),
         )
@@ -108,7 +114,7 @@ impl Parser for ParameterParser {
             .parse(buf)
     }
 }
-fn parameter() -> impl Parser<ParseResult = Parameter> {
+fn parameter() -> ParameterParser {
     ParameterParser
 }
 
@@ -116,7 +122,7 @@ fn parameters() -> impl Parser<ParseResult = Vec<Parameter>> {
     parameter()
         .sep_by(spaces().with(char(',').skip(spaces())))
         .between(char('[').skip(spaces()), spaces().with(char(']')))
-        .or(parameter().sep_by(spaces().with(char(',')).skip(spaces())))
+        .or(parameter().sep_by(char(',')))
 }
 
 #[derive(Copy, Clone)]
@@ -146,54 +152,31 @@ fn repeated() -> impl Parser<ParseResult = Vec<Token>> {
 
 fn random_integer_token() -> impl Parser<ParseResult = Token> {
     char('i').with(parameters()).flat_map(|v| match &v[..] {
-        [Int(a)] => Ok(Gen(RandomIntegerNoGreaterThan(*a))),
-        [Int(a), Int(b)] => Ok(Gen(RandomIntegerBetween(*a, *b))),
+        [Int(Confirm(a))] => Ok(Gen(RandomIntegerNoGreaterThan(*a))),
+        [Int(Confirm(a)), Int(Confirm(b))] => Ok(Gen(RandomIntegerBetween(*a, *b))),
         _ => Err(ParseError),
     })
 }
 
 fn random_string_token() -> impl Parser<ParseResult = Token> {
     char('s').with(parameters()).flat_map(|v| match &v[..] {
-        [Int(a)] => Ok(Gen(RandomString(Lower(a.to_usize().ok_or(ParseError)?)))),
-        [Enum(e), Int(a)] if e == "lower" => {
-            Ok(Gen(RandomString(Lower(a.to_usize().ok_or(ParseError)?))))
+        [Int(t)] => Ok(Gen(RandomString(Lower(t.clone())))),
+        [Enum(e), Int(t)] if e == "lower" => Ok(Gen(RandomString(Lower(t.clone())))),
+        [Enum(e), Int(t)] if e == "upper" => Ok(Gen(RandomString(Upper(t.clone())))),
+        [Enum(e), Int(t)] if e == "alpha" => Ok(Gen(RandomString(Alpha(t.clone())))),
+        [Enum(e), Int(t)] if e == "bin" => Ok(Gen(RandomString(Bin(t.clone())))),
+        [Enum(e), Int(t)] if e == "oct" => Ok(Gen(RandomString(Oct(t.clone())))),
+        [Enum(e), Int(t)] if e == "dec" => Ok(Gen(RandomString(Dec(t.clone())))),
+        [Enum(e), Int(t)] if e == "hexlower" => Ok(Gen(RandomString(HexLower(t.clone())))),
+        [Enum(e), Int(t)] if e == "hexupper" => Ok(Gen(RandomString(HexUpper(t.clone())))),
+        [Enum(e), Int(t)] if e == "alnum" => Ok(Gen(RandomString(Alnum(t.clone())))),
+        [Enum(e), Int(t)] if e == "graph" => Ok(Gen(RandomString(Graph(t.clone())))),
+        [Enum(e), Str(s), Int(t)] if e == "oneof" => {
+            Ok(Gen(RandomString(OneOf(s.clone(), t.clone()))))
         }
-        [Enum(e), Int(a)] if e == "upper" => {
-            Ok(Gen(RandomString(Upper(a.to_usize().ok_or(ParseError)?))))
+        [Enum(e), Char(l), Char(r), Int(t)] if e == "between" => {
+            Ok(Gen(RandomString(Between(*l, *r, t.clone()))))
         }
-        [Enum(e), Int(a)] if e == "alpha" => {
-            Ok(Gen(RandomString(Alpha(a.to_usize().ok_or(ParseError)?))))
-        }
-        [Enum(e), Int(a)] if e == "bin" => {
-            Ok(Gen(RandomString(Bin(a.to_usize().ok_or(ParseError)?))))
-        }
-        [Enum(e), Int(a)] if e == "oct" => {
-            Ok(Gen(RandomString(Oct(a.to_usize().ok_or(ParseError)?))))
-        }
-        [Enum(e), Int(a)] if e == "dec" => {
-            Ok(Gen(RandomString(Dec(a.to_usize().ok_or(ParseError)?))))
-        }
-        [Enum(e), Int(a)] if e == "hexlower" => {
-            Ok(Gen(RandomString(HexLower(a.to_usize().ok_or(ParseError)?))))
-        }
-        [Enum(e), Int(a)] if e == "hexupper" => {
-            Ok(Gen(RandomString(HexUpper(a.to_usize().ok_or(ParseError)?))))
-        }
-        [Enum(e), Int(a)] if e == "alnum" => {
-            Ok(Gen(RandomString(Alnum(a.to_usize().ok_or(ParseError)?))))
-        }
-        [Enum(e), Int(a)] if e == "graph" => {
-            Ok(Gen(RandomString(Graph(a.to_usize().ok_or(ParseError)?))))
-        }
-        [Enum(e), Str(s), Int(a)] if e == "oneof" => Ok(Gen(RandomString(OneOf(
-            s.clone(),
-            a.to_usize().ok_or(ParseError)?,
-        )))),
-        [Enum(e), Char(l), Char(r), Int(a)] if e == "between" => Ok(Gen(RandomString(Between(
-            *l,
-            *r,
-            a.to_usize().ok_or(ParseError)?,
-        )))),
         _ => Err(ParseError),
     })
 }
@@ -202,22 +185,22 @@ fn repeated_token() -> impl Parser<ParseResult = Token> {
     char('X')
         .with(parameters())
         .flat_map(|v| match &v[..] {
-            [Int(a)] => Ok(a.to_usize().ok_or(ParseError)?),
+            [Int(Confirm(a))] => Ok(a.to_usize()?),
             _ => Err(ParseError),
         })
         .and(repeated())
-        .map(|(times, v)| Gen(Array(times, v)))
+        .map(|(times, v)| Gen(Repeat(times, v)))
 }
 
 fn array_token() -> impl Parser<ParseResult = Token> {
     char('A')
         .with(parameters())
         .flat_map(|v| match &v[..] {
-            [Int(a)] => Ok(a.to_usize().ok_or(ParseError)?),
+            [Int(Confirm(a))] => Ok(a.to_usize()?),
             _ => Err(ParseError),
         })
         .and(repeated())
-        .map(|(times, v)| Gen(TestCase(times, v)))
+        .map(|(times, v)| Gen(Array(times, v)))
 }
 
 pub fn cmp_op() -> impl Parser<ParseResult = Token> {

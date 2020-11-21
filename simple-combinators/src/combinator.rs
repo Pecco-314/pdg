@@ -322,7 +322,7 @@ where
         let mut iter = self.parser.iter(buf);
         let first = iter.next().ok_or(ParseError)?;
         collection.extend_one(first);
-        let sep = self.sep.with(self.parser);
+        let sep = attempt(self.sep.with(self.parser));
         let iter = sep.iter(buf);
         collection.extend(iter);
         Ok(collection)

@@ -1,13 +1,20 @@
 #![feature(bool_to_option)]
+#![feature(try_trait)]
 #![feature(extend_one)]
 pub mod combinator;
 pub mod parser;
 use combinator::*;
 use derive_more::{Display, Error};
 use std::marker::PhantomData;
+use std::option::NoneError;
 
 #[derive(Debug, Display, Error)]
 pub struct ParseError;
+impl From<NoneError> for ParseError {
+    fn from(_: NoneError) -> ParseError {
+        ParseError
+    }
+}
 
 pub struct ParserIter<'a, 'b, P> {
     pub(crate) parser: &'a P,
