@@ -72,14 +72,44 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
         })
 }
 
-fn parameter() -> impl Parser<ParseResult = Parameter> {
+fn int_parameter() -> impl Parser<ParseResult = Parameter> {
     number()
         .map(|i| Int(i))
-        .or(quoted_string().map(|s| Str(s)))
-        .or(any().between(char('\''), char('\'')).map(|c| Char(c)))
-        .or(string("true").map(|_| Bool(true)))
-        .or(string("false").map(|_| Bool(false)))
-        .or(word().map(|e| Enum(e)))
+        .or(
+            char('!').with(random_integer_token().flat_map(|token| match token {
+                Gen(gen) => Ok(gen.generate().ok_or(ParseError)?),
+                _ => Err(ParseError),
+            })),
+        )
+}
+
+fn str_parameter() -> impl Parser<ParseResult = Parameter> {
+    quoted_string()
+        .map(|s| Str(s))
+        .or(
+            char('!').with(random_string_token().flat_map(|token| match token {
+                Gen(gen) => Ok(gen.generate().ok_or(ParseError)?),
+                _ => Err(ParseError),
+            })),
+        )
+}
+
+#[derive(Copy, Clone)]
+struct ParameterParser;
+impl Parser for ParameterParser {
+    type ParseResult = Parameter;
+    fn parse(&self, buf: &mut &str) -> Result<Self::ParseResult, ParseError> {
+        int_parameter()
+            .or(str_parameter())
+            .or(any().between(char('\''), char('\'')).map(|c| Char(c)))
+            .or(string("true").map(|_| Bool(true)))
+            .or(string("false").map(|_| Bool(false)))
+            .or(word().map(|e| Enum(e)))
+            .parse(buf)
+    }
+}
+fn parameter() -> impl Parser<ParseResult = Parameter> {
+    ParameterParser
 }
 
 fn parameters() -> impl Parser<ParseResult = Vec<Parameter>> {

@@ -40,6 +40,7 @@ fn parse_and_generate(mut buf: &str, fold: PathBuf, config: &Config) {
     let mut is_first = true;
     loop {
         let (range, tokens, end) = parse_once(&mut buf, is_first);
+        println!("{:?}", tokens);
         is_first = false;
         for i in range {
             generate(i, &tokens, &fold, config);
