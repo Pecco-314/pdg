@@ -12,3 +12,4 @@ include = ["example/*/template.txt"]
 "rand" = "^0.7"
 "num" = "^0.3"
 "powershell_script" ="^0.1"
+"colour" = "^0.5"

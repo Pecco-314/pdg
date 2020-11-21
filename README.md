@@ -97,7 +97,7 @@ pdg template.txt
 
 | 格式             | 示例              | 作用                                             |
 | ---------------- | ----------------- | ------------------------------------------------ |
-| `#fold[f:Str]`   | `#fold["data"]`   | 输出到f文件夹                                    |
+| `#folder[f:Str]` | `#folder["data"]` | 输出到f文件夹                                    |
 | `#pause[b:Bool]` | `#pause[true]`    | 控制程序结束后是否暂停                           |
 | `#prefix[p:Str]` | `#prefix["test"]` | 给得到的测试文件名添加前缀                       |
 | `#std[e:Str]`    | `#std["std.exe"]` | 执行可执行文件e，为每个.in文件生成对应的.out文件 |

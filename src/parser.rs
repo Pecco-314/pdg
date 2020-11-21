@@ -10,10 +10,10 @@ pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
     use StrParameter::*;
     spaces()
         .with(
-            string("#fold")
+            string("#folder")
                 .with(parameters())
                 .flat_map(|v| match &v[..] {
-                    [Str(s)] => Some(Fold(resolve!(s, str))),
+                    [Str(s)] => Some(Folder(resolve!(s, str))),
                     _ => None,
                 })
                 .or(string("#pause")
@@ -47,8 +47,8 @@ impl Parser for ConfigParser {
         };
         for item in config_item().iter(buf) {
             match item {
-                Fold(s) => {
-                    config.fold = Some(s);
+                Folder(s) => {
+                    config.folder = Some(s);
                 }
                 Pause(b) => {
                     config.pause = Some(b);

@@ -1,14 +1,13 @@
 use crate::{
     details::With,
     random::{random_pair, random_string},
-    resolve,
+    random_range, resolve,
     token::{Gen::*, Parameter::*},
 };
-use rand::prelude::{thread_rng, Rng};
 
 #[derive(Clone, Debug)]
 pub enum ConfigItem {
-    Fold(String),
+    Folder(String),
     Pause(bool),
     Prefix(String),
     Std(String),
@@ -16,7 +15,7 @@ pub enum ConfigItem {
 
 #[derive(Clone, Debug, Default)]
 pub struct Config {
-    pub fold: Option<String>,
+    pub folder: Option<String>,
     pub pause: Option<bool>,
     pub prefix: Option<String>,
     pub std: Option<String>,
@@ -144,12 +143,14 @@ impl Gen {
             NewLine => Some(Char('\n')),
             ConstantString(s) => Some(Str(StrParameter::Confirm(s.clone()))),
             ConstantInteger(a) => Some(Int(IntParameter::Confirm(*a))),
-            RandomInteger(Between(l, r)) => Some(Int(IntParameter::Confirm(
-                thread_rng().gen_range(resolve!(l, int), resolve!(r, int)),
-            ))),
-            RandomInteger(NoGreaterThan(r)) => Some(Int(IntParameter::Confirm(
-                thread_rng().gen_range(0, resolve!(r, int) + 1),
-            ))),
+            RandomInteger(Between(l, r)) => Some(Int(IntParameter::Confirm(random_range!(
+                resolve!(l, int),
+                resolve!(r, int)
+            )))),
+            RandomInteger(NoGreaterThan(r)) => Some(Int(IntParameter::Confirm(random_range!(
+                0,
+                resolve!(r, int)
+            )))),
             Repeat(times, v) => {
                 let mut s = String::new();
                 let mut gens = cul_token(v)?;

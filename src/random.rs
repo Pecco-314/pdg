@@ -7,7 +7,7 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 macro_rules! distribute{
     ($sum:expr; $($freq:expr, $func:expr);+)=>{{
             let mut ans = None;
-            let mut cc = thread_rng().gen_range(0,$sum);
+            let mut cc = random_range!(0,$sum);
             'lp:{$(
                 cc -= $freq;
                 if cc<0 {
@@ -20,22 +20,38 @@ macro_rules! distribute{
     }}
 }
 
+#[macro_export]
+macro_rules! random_range {
+    ($a:expr, $b:expr) => {
+        if $a > $b {
+            use crate::details::error_info;
+            error_info(&format!(
+                "Tried to generate random integer between {} and {}, but {} > {}",
+                $a, $b, $a, $b,
+            ))
+        } else {
+            use rand::prelude::{thread_rng, Rng};
+            thread_rng().gen_range($a, $b + 1)
+        }
+    };
+}
+
 pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
     match op {
         Op::LessThan => {
             let (x, y) = random_pair(l1, r1, l2 - 1, r2 - 1, Op::NoGreaterThan);
-            (x, y + 1)
+            (x, y)
         }
         Op::GreaterThan => {
             let (x, y) = random_pair(l1, r1, l2 + 1, r2 + 1, Op::NoLessThan);
-            (x, y - 1)
+            (x, y)
         }
         Op::NoGreaterThan => {
             let r1 = r1.min(r2);
             let l2 = l2.max(l1);
             loop {
-                let x = thread_rng().gen_range(l1, r1 + 1);
-                let y = thread_rng().gen_range(l2, r2 + 1);
+                let x = random_range!(l1, r1);
+                let y = random_range!(l2, r2);
                 if x <= y {
                     return (x, y);
                 }
@@ -45,8 +61,8 @@ pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
             let r2 = r1.min(r2);
             let l1 = l2.max(l1);
             loop {
-                let x = thread_rng().gen_range(l1, r1 + 1);
-                let y = thread_rng().gen_range(l2, r2 + 1);
+                let x = random_range!(l1, r1);
+                let y = random_range!(l2, r2);
                 if x >= y {
                     return (x, y);
                 }
@@ -56,7 +72,7 @@ pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
 }
 
 pub fn random_char(l: char, r: char) -> Option<char> {
-    std::char::from_u32(thread_rng().gen_range(l as u32, r as u32 + 1))
+    std::char::from_u32(random_range!(l as u32, r as u32 + 1))
 }
 
 pub fn random_string(rs: &RandomString) -> Option<String> {

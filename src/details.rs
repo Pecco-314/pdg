@@ -1,3 +1,5 @@
+use colour::e_red;
+use std::process::exit;
 pub trait Push {
     fn push(&mut self, c: char);
     fn push_str(&mut self, s: &str);
@@ -42,4 +44,11 @@ macro_rules! resolve {
             $T::Lazy(g) => g.generate()?.$ty()?,
         }
     };
+}
+
+pub fn error_info(info: &str) -> ! {
+    e_red!("error");
+    eprint!(": ");
+    eprintln!("{}", info);
+    exit(1);
 }

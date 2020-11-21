@@ -25,7 +25,12 @@ impl<T, E> IntoParseError<T> for Result<T, E> {
     }
 }
 pub fn slice_some(buf: &str) -> &str {
-    let end = buf.char_indices().map(|(i, _)| i).take(20).last();
+    let end = buf
+        .char_indices()
+        .take_while(|(_, c)| *c != '\n')
+        .map(|(i, _)| i)
+        .take(20)
+        .last();
     let end = match end {
         None => 0,
         Some(x) => x,
