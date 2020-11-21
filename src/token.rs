@@ -2,7 +2,7 @@ use crate::{
     details::With,
     random::{random_pair, random_string},
     resolve,
-    token::{Gen::*, IntParameter::*, Parameter::*},
+    token::{Gen::*, Parameter::*},
 };
 use rand::prelude::{thread_rng, Rng};
 
@@ -32,7 +32,7 @@ pub enum RandomString {
     HexUpper(IntParameter),
     Alnum(IntParameter),
     Graph(IntParameter),
-    OneOf(String, IntParameter),
+    OneOf(StrParameter, IntParameter),
     Between(char, char, IntParameter),
 }
 #[derive(Clone, Debug)]
@@ -68,14 +68,23 @@ pub enum Parameter {
     Int(IntParameter), // Size类型参数当作Int解析再转化
     Char(char),
     Enum(String),
-    Str(String),
+    Str(StrParameter),
     Bool(bool),
 }
 impl Parameter {
     pub fn int(&self) -> Option<i64> {
+        use IntParameter::*;
         match self {
-            Parameter::Int(Confirm(i)) => Some(*i),
-            Parameter::Int(Lazy(i)) => i.generate()?.int(),
+            Int(Confirm(i)) => Some(*i),
+            Int(Lazy(i)) => i.generate()?.int(),
+            _ => None,
+        }
+    }
+    pub fn str(&self) -> Option<String> {
+        use StrParameter::*;
+        match self {
+            Str(Confirm(s)) => Some(s.clone()),
+            Str(Lazy(s)) => s.generate()?.str(),
             _ => None,
         }
     }
@@ -85,9 +94,14 @@ pub enum IntParameter {
     Confirm(i64),
     Lazy(Box<Gen>),
 }
+#[derive(Clone, Debug)]
+pub enum StrParameter {
+    Confirm(String),
+    Lazy(Box<Gen>),
+}
 
 fn cul(a: &Gen, b: &Gen, op: &Op) -> Option<Gen> {
-    use crate::token::RandomInteger::*;
+    use crate::token::{IntParameter::*, RandomInteger::*};
     let (l1, r1) = match a {
         RandomInteger(Between(l, r)) => (resolve!(l, int), resolve!(r, int)),
         RandomInteger(NoGreaterThan(r)) => (0, resolve!(r, int)),
@@ -123,15 +137,15 @@ pub fn cul_token(tokens: &Vec<Token>) -> Option<Vec<Gen>> {
 }
 impl Gen {
     pub fn generate(&self) -> Option<Parameter> {
-        use crate::token::RandomInteger::*;
+        use crate::token::{IntParameter::*, RandomInteger::*};
         match self {
             NewLine => Some(Char('\n')),
-            ConstantString(s) => Some(Str(s.clone())),
-            ConstantInteger(a) => Some(Int(Confirm(*a))),
-            RandomInteger(Between(l, r)) => Some(Int(Confirm(
+            ConstantString(s) => Some(Str(StrParameter::Confirm(s.clone()))),
+            ConstantInteger(a) => Some(Int(IntParameter::Confirm(*a))),
+            RandomInteger(Between(l, r)) => Some(Int(IntParameter::Confirm(
                 thread_rng().gen_range(resolve!(l, int), resolve!(r, int)),
             ))),
-            RandomInteger(NoGreaterThan(r)) => Some(Int(Confirm(
+            RandomInteger(NoGreaterThan(r)) => Some(Int(IntParameter::Confirm(
                 thread_rng().gen_range(0, resolve!(r, int) + 1),
             ))),
             Repeat(times, v) => {
@@ -142,26 +156,25 @@ impl Gen {
                         s.push_str(&i.generate_str()?);
                     }
                 }
-                Some(Str(s))
+                Some(Str(StrParameter::Confirm(s)))
             }
-            Array(times, v) => {
-                Some(Str(times.to_string().with('\n')
-                    + Repeat(*times, v.clone()).generate_str()?.as_str()))
-            }
+            Array(times, v) => Some(Str(StrParameter::Confirm(
+                times.to_string().with('\n') + Repeat(*times, v.clone()).generate_str()?.as_str(),
+            ))),
             RandomIntegerPair(l1, r1, l2, r2, op) => {
                 let (a, b) = random_pair(*l1, *r1, *l2, *r2, *op);
                 let mut s = a.to_string().with(' ');
                 s.push_str(&b.to_string());
-                Some(Str(s.with(' ')))
+                Some(Str(StrParameter::Confirm(s.with(' '))))
             }
-            RandomString(rs) => Some(Str(random_string(&rs)?)),
+            RandomString(rs) => Some(Str(StrParameter::Confirm(random_string(&rs)?))),
         }
     }
     pub fn generate_str(&self) -> Option<String> {
         match self.generate()? {
-            Parameter::Int(Confirm(i)) => Some(i.to_string().with(' ')),
+            Parameter::Int(IntParameter::Confirm(i)) => Some(i.to_string().with(' ')),
             Parameter::Char(c) => Some(c.to_string()),
-            Parameter::Str(s) => Some(s),
+            Parameter::Str(StrParameter::Confirm(s)) => Some(s),
             _ => None,
         }
     }

@@ -1,6 +1,6 @@
 use crate::{
     resolve,
-    token::{IntParameter::*, Op, RandomString, RandomString::*},
+    token::{Op, RandomString, RandomString::*, *},
 };
 use num::cast::ToPrimitive;
 use rand::{seq::SliceRandom, thread_rng, Rng};
@@ -60,10 +60,11 @@ pub fn random_char(l: char, r: char) -> Option<char> {
 }
 
 pub fn random_string(rs: &RandomString) -> Option<String> {
+    use IntParameter::*;
     let mut s = String::new();
     match rs {
         OneOf(dict, t) => {
-            let dict: Vec<char> = dict.chars().collect();
+            let dict: Vec<char> = resolve!(dict, str, StrParameter).chars().collect();
             for _ in 0..resolve!(t, int).to_usize()? {
                 s.push(*dict[..].choose(&mut thread_rng())?);
             }

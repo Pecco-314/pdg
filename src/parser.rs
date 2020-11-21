@@ -1,17 +1,19 @@
-use crate::token::{
-    ConfigItem::*, Gen::*, IntParameter::*, Parameter::*, RandomString::*, Token::*, *,
+use crate::{
+    resolve,
+    token::{ConfigItem::*, Gen::*, Parameter::*, RandomString::*, Token::*, *},
 };
 use num::cast::ToPrimitive;
 use simple_combinators::{combinator::optional, parser::*, ParseError, Parser};
 use std::ops::Range;
 
 pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
+    use StrParameter::*;
     spaces()
         .with(
             string("#fold")
                 .with(parameters())
                 .flat_map(|v| match &v[..] {
-                    [Str(s)] => Ok(Fold(s.clone())),
+                    [Str(s)] => Ok(Fold(resolve!(s, str))),
                     _ => Err(ParseError),
                 })
                 .or(string("#pause")
@@ -23,7 +25,7 @@ pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
                 .or(string("#prefix")
                     .with(parameters())
                     .flat_map(|v| match &v[..] {
-                        [Str(s)] => Ok(Prefix(s.clone())),
+                        [Str(s)] => Ok(Prefix(resolve!(s, str))),
                         _ => Err(ParseError),
                     })),
         )
@@ -71,6 +73,7 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
 }
 
 fn int_parameter() -> impl Parser<ParseResult = Parameter> {
+    use IntParameter::*;
     number()
         .map(|i| Int(Confirm(i)))
         .or(
@@ -88,11 +91,18 @@ fn int_parameter() -> impl Parser<ParseResult = Parameter> {
 }
 
 fn str_parameter() -> impl Parser<ParseResult = Parameter> {
+    use StrParameter::*;
     quoted_string()
-        .map(|s| Str(s))
+        .map(|s| Str(Confirm(s)))
         .or(
             char('!').with(random_string_token().flat_map(|token| match token {
                 Gen(gen) => Ok(gen.generate().ok_or(ParseError)?),
+                _ => Err(ParseError),
+            })),
+        )
+        .or(
+            char('?').with(random_string_token().flat_map(|token| match token {
+                Gen(gen) => Ok(Str(Lazy(Box::new(gen)))),
                 _ => Err(ParseError),
             })),
         )
@@ -184,7 +194,7 @@ fn repeated_token() -> impl Parser<ParseResult = Token> {
     char('X')
         .with(parameters())
         .flat_map(|v| match &v[..] {
-            [Int(Confirm(a))] => Ok(a.to_usize()?),
+            [Int(IntParameter::Confirm(a))] => Ok(a.to_usize()?),
             _ => Err(ParseError),
         })
         .and(repeated())
@@ -195,7 +205,7 @@ fn array_token() -> impl Parser<ParseResult = Token> {
     char('A')
         .with(parameters())
         .flat_map(|v| match &v[..] {
-            [Int(Confirm(a))] => Ok(a.to_usize()?),
+            [Int(IntParameter::Confirm(a))] => Ok(a.to_usize()?),
             _ => Err(ParseError),
         })
         .and(repeated())

@@ -32,8 +32,14 @@ impl With for String {}
 macro_rules! resolve {
     ($t:expr, $ty:ident) => {
         match $t {
-            Confirm(i) => *i,
+            Confirm(i) => i.clone(),
             Lazy(g) => g.generate()?.$ty()?,
+        }
+    };
+    ($t:expr, $ty:ident, $T:ident) => {
+        match $t {
+            $T::Confirm(i) => i.clone(),
+            $T::Lazy(g) => g.generate()?.$ty()?,
         }
     };
 }
