@@ -3,7 +3,6 @@ mod details;
 mod parser;
 mod random;
 mod token;
-use details::With;
 use parser::{config, file_range, token};
 use simple_combinators::Parser;
 use std::{

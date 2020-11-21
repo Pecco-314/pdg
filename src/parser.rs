@@ -168,8 +168,8 @@ fn random_string_token() -> impl Parser<ParseResult = Token> {
     })
 }
 
-fn array_token() -> impl Parser<ParseResult = Token> {
-    char('A')
+fn repeated_token() -> impl Parser<ParseResult = Token> {
+    char('X')
         .with(parameters())
         .flat_map(|v| match &v[..] {
             [Int(a)] => Ok(a.to_usize().ok_or(ParseError)?),
@@ -179,8 +179,8 @@ fn array_token() -> impl Parser<ParseResult = Token> {
         .map(|(times, v)| Gen(Array(times, v)))
 }
 
-fn testcase_token() -> impl Parser<ParseResult = Token> {
-    char('T')
+fn array_token() -> impl Parser<ParseResult = Token> {
+    char('A')
         .with(parameters())
         .flat_map(|v| match &v[..] {
             [Int(a)] => Ok(a.to_usize().ok_or(ParseError)?),
@@ -210,8 +210,8 @@ pub fn token() -> impl Parser<ParseResult = Token> {
         .with(
             constant()
                 .or(random_integer_token())
+                .or(repeated_token())
                 .or(array_token())
-                .or(testcase_token())
                 .or(random_string_token())
                 .or(cmp_op()),
         )
