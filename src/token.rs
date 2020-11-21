@@ -1,9 +1,9 @@
-use crate::details::With;
-use crate::random::*;
-use rand::prelude::*;
-pub use Gen::*;
-pub use Op::*;
-use Parameter::*;
+use self::{Gen::*, IntParameter::*, Parameter::*};
+use crate::{
+    details::With,
+    random::{random_pair, random_string},
+};
+use rand::prelude::{thread_rng, Rng};
 
 #[derive(Clone, Debug)]
 pub enum ConfigItem {
@@ -69,8 +69,8 @@ pub enum Parameter {
 impl Parameter {
     pub fn int(&self) -> Option<i64> {
         match self {
-            Int(Confirm(i)) => Some(*i),
-            Int(Lazy(i)) => i.generate()?.int(),
+            Parameter::Int(Confirm(i)) => Some(*i),
+            Parameter::Int(Lazy(i)) => i.generate()?.int(),
             _ => None,
         }
     }
@@ -80,7 +80,6 @@ pub enum IntParameter {
     Confirm(i64),
     Lazy(Box<Gen>),
 }
-pub use IntParameter::*;
 
 fn cul(a: &Gen, b: &Gen, op: &Op) -> Option<Gen> {
     let (l1, r1) = match a {
@@ -149,9 +148,9 @@ impl Gen {
     }
     pub fn generate_str(&self) -> Option<String> {
         match self.generate()? {
-            Int(Confirm(i)) => Some(i.to_string().with(' ')),
-            Char(c) => Some(c.to_string()),
-            Str(s) => Some(s),
+            Parameter::Int(Confirm(i)) => Some(i.to_string().with(' ')),
+            Parameter::Char(c) => Some(c.to_string()),
+            Parameter::Str(s) => Some(s),
             _ => None,
         }
     }

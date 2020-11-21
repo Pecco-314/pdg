@@ -1,4 +1,7 @@
-use crate::{resolve, token::*};
+use crate::{
+    resolve,
+    token::{IntParameter::*, Op, RandomString, RandomString::*},
+};
 use num::cast::ToPrimitive;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 macro_rules! distribute{
@@ -19,15 +22,15 @@ macro_rules! distribute{
 
 pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
     match op {
-        LessThan => {
-            let (x, y) = random_pair(l1, r1, l2 - 1, r2 - 1, NoGreaterThan);
+        Op::LessThan => {
+            let (x, y) = random_pair(l1, r1, l2 - 1, r2 - 1, Op::NoGreaterThan);
             (x, y + 1)
         }
-        GreaterThan => {
-            let (x, y) = random_pair(l1, r1, l2 + 1, r2 + 1, NoLessThan);
+        Op::GreaterThan => {
+            let (x, y) = random_pair(l1, r1, l2 + 1, r2 + 1, Op::NoLessThan);
             (x, y - 1)
         }
-        NoGreaterThan => {
+        Op::NoGreaterThan => {
             let r1 = r1.min(r2);
             let l2 = l2.max(l1);
             loop {
@@ -38,7 +41,7 @@ pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
                 }
             }
         }
-        NoLessThan => {
+        Op::NoLessThan => {
             let r2 = r1.min(r2);
             let l1 = l2.max(l1);
             loop {
@@ -57,7 +60,6 @@ pub fn random_char(l: char, r: char) -> Option<char> {
 }
 
 pub fn random_string(rs: &RandomString) -> Option<String> {
-    use RandomString::*;
     let mut s = String::new();
     match rs {
         OneOf(dict, t) => {

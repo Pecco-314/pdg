@@ -1,11 +1,9 @@
-use crate::token::*;
+use crate::token::{
+    ConfigItem::*, Gen::*, IntParameter::*, Op::*, Parameter::*, RandomString::*, Token::*, *,
+};
 use num::cast::ToPrimitive;
 use simple_combinators::{combinator::optional, parser::*, ParseError, Parser};
 use std::ops::Range;
-use ConfigItem::*;
-use Parameter::*;
-use RandomString::*;
-use Token::*;
 
 pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
     spaces()
