@@ -46,6 +46,22 @@ macro_rules! resolve {
     };
 }
 
+pub trait Ignore<T> {
+    fn ignore(self) -> T; // 默认不会panic的情况下忽略错误
+}
+
+impl<T, E> Ignore<T> for Result<T, E> {
+    fn ignore(self) -> T {
+        self.unwrap_or_else(|_| panic!(""))
+    }
+}
+
+impl<T> Ignore<T> for Option<T> {
+    fn ignore(self) -> T {
+        self.unwrap_or_else(|| panic!(""))
+    }
+}
+
 pub fn error_info(info: &str) -> ! {
     e_red!("error");
     eprint!(": ");

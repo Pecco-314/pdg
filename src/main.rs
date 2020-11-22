@@ -4,7 +4,7 @@ mod parser;
 mod random;
 mod token;
 use crate::{
-    details::error_info,
+    details::{error_info, Ignore},
     parser::{config, file_range, token},
     token::{cul_token, Config, Token},
 };
@@ -21,7 +21,7 @@ use std::{
 
 fn pause() {
     println!("(Press any key to exit)");
-    io::stdin().read_line(&mut String::new()).unwrap();
+    io::stdin().read_line(&mut String::new()).ignore();
 }
 
 fn parse_once(buf: &mut &str, is_first: bool) -> (Range<usize>, Vec<Token>, bool) {
@@ -108,9 +108,9 @@ fn run_std(folder: &PathBuf, output: &str, input: &str, std: &str) {
     powershell_script::run(
         &format!(
             "Get-Content {} | {} | Out-File {}",
-            folder.join(input).to_str().unwrap(),
+            folder.join(input).to_str().ignore(),
             std,
-            folder.join(output).to_str().unwrap(), // 这里应该不会panic
+            folder.join(output).to_str().ignore(),
         ),
         false,
     )
@@ -148,7 +148,7 @@ fn get_folder(template: &PathBuf, config: &Config) -> PathBuf {
     let folder = if let Some(s) = &config.folder {
         Path::new(&s).to_path_buf() // 如果重定向了输出文件夹则应用
     } else {
-        template.parent().unwrap().join("testdata") // 此处不会panic
+        template.parent().ignore().join("testdata")
     };
     match fs::create_dir_all(&folder) {
         Ok(()) => folder,
@@ -164,7 +164,7 @@ fn get_folder(template: &PathBuf, config: &Config) -> PathBuf {
 fn main() {
     let (path, template) = get_template();
     let mut buf = template.as_str();
-    let config = config().parse(&mut buf).unwrap(); // 解析配置，此处不会panic
+    let config = config().parse(&mut buf).ignore(); // 解析配置，此处不会panic
     let folder = get_folder(&path, &config);
     parse_and_generate(buf, folder, &config);
     if let Some(true) | None = config.pause {

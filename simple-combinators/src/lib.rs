@@ -4,10 +4,8 @@
 pub mod combinator;
 pub mod parser;
 use combinator::*;
-use derive_more::{Display, Error};
 use std::marker::PhantomData;
 
-#[derive(Debug, Display, Error)]
 pub struct ParseError<'a> {
     pub position: &'a str,
 }

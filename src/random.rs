@@ -3,7 +3,7 @@ use crate::{
     token::{Op, RandomString, RandomString::*, *},
 };
 use num::cast::ToPrimitive;
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::{seq::SliceRandom, thread_rng};
 macro_rules! distribute{
     ($sum:expr; $($freq:expr, $func:expr);+)=>{{
             let mut ans = None;
