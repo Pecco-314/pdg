@@ -134,7 +134,7 @@ pub fn cul_token(tokens: &Vec<Token>) -> Option<Vec<Gen>> {
             }
         }
     }
-    Some(gens)
+    cur_op.is_none().then_some(gens)
 }
 impl Gen {
     pub fn generate(&self) -> Option<Parameter> {

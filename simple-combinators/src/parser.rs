@@ -57,7 +57,7 @@ where
         .or(many1(one_of("0123456789")).flat_map(|s: String| s.parse::<I>())) // 再解析失败则尝试只解析数字
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Str<'a> {
     string: &'a str,
 }

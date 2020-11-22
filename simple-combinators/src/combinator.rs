@@ -1,5 +1,5 @@
 use crate::{slice_some, IntoParseError, ParseError, Parser};
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 macro_rules! impl_copy_and_clone {
     ($struct:ident<$($ctype:ident),*; $($ptype:ident),*>) => {
@@ -25,7 +25,7 @@ where
     F: Fn(char) -> bool + Copy,
 {
     type ParseResult = char;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let mut iter = buf.chars();
         let first = iter.next().ok_or(ParseError {
             position: slice_some(buf),
@@ -44,7 +44,7 @@ where
 pub fn satisfy<F>(satisfy_func: F) -> Satisfy<F> {
     Satisfy { satisfy_func }
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct With<P1, P2> {
     pub(crate) parser1: P1,
     pub(crate) parser2: P2,
@@ -56,14 +56,14 @@ where
     P2: Parser,
 {
     type ParseResult = P2::ParseResult;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         self.parser1.parse(buf)?;
         let res = self.parser2.parse(buf)?;
         Ok(res)
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Skip<P1, P2> {
     pub(crate) parser1: P1,
     pub(crate) parser2: P2,
@@ -75,14 +75,14 @@ where
     P2: Parser,
 {
     type ParseResult = P1::ParseResult;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let res = self.parser1.parse(buf)?;
         self.parser2.parse(buf)?;
         Ok(res)
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct And<P1, P2> {
     pub(crate) parser1: P1,
     pub(crate) parser2: P2,
@@ -94,14 +94,14 @@ where
     P2: Parser,
 {
     type ParseResult = (P1::ParseResult, P2::ParseResult);
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let res1 = self.parser1.parse(buf)?;
         let res2 = self.parser2.parse(buf)?;
         Ok((res1, res2))
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Map<P, F> {
     pub(crate) parser: P,
     pub(crate) callback: F,
@@ -112,12 +112,13 @@ where
     F: Fn(P::ParseResult) -> R + Copy,
 {
     type ParseResult = R;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let raw = self.parser.parse(buf)?;
         Ok((self.callback)(raw))
     }
 }
 
+#[derive(Debug)]
 pub struct FlatMap<P, F, R> {
     pub(crate) parser: P,
     pub(crate) callback: F,
@@ -131,7 +132,7 @@ where
     E: IntoParseError<R>,
 {
     type ParseResult = R;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let raw = self.parser.parse(buf)?;
         let res = (self.callback)(raw).into_if_err(ParseError {
             position: slice_some(buf),
@@ -140,7 +141,7 @@ where
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Attempt<P> {
     parser: P,
 }
@@ -149,7 +150,7 @@ where
     P: Parser,
 {
     type ParseResult = P::ParseResult;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let backup = *buf;
         let res = self.parser.parse(buf);
         if res.is_err() {
@@ -165,7 +166,7 @@ where
     Attempt { parser: parser }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Optional<P> {
     parser: P,
 }
@@ -174,7 +175,7 @@ where
     P: Parser,
 {
     type ParseResult = Option<P::ParseResult>;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let backup = *buf;
         let res = self.parser.parse(buf);
         if res.is_err() {
@@ -190,7 +191,7 @@ where
     Optional { parser: parser }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Preview<P> {
     parser: P,
 }
@@ -199,7 +200,7 @@ where
     P: Parser,
 {
     type ParseResult = P::ParseResult;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let backup = *buf;
         let res = self.parser.parse(buf);
         *buf = backup;
@@ -220,40 +221,31 @@ where
     parser.map(|_| ())
 }
 
+#[derive(Debug)]
 pub struct Repeat<P, R> {
     pub(crate) parser: P,
     pub(crate) times: usize,
     pub(crate) output: PhantomData<R>,
 }
-impl<P, R> Copy for Repeat<P, R> where P: Parser {}
-impl<P, R> Clone for Repeat<P, R>
-where
-    P: Parser,
-{
-    fn clone(&self) -> Self {
-        *self
-    }
-}
+impl_copy_and_clone!(Repeat<P;R>);
 impl<P, R> Parser for Repeat<P, R>
 where
     P: Parser,
     R: Extend<P::ParseResult> + Default,
 {
     type ParseResult = R;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
-        let backup = *buf;
-        let mut iter = self.parser.iter(buf);
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
+        let mut iter = self.parser.iter(buf).with_result();
         let mut collection = R::default();
         for _ in 0..self.times {
-            let cur = iter.next().ok_or(ParseError {
-                position: slice_some(backup),
-            })?;
+            let cur = iter.next().unwrap()?;
             collection.extend_one(cur);
         }
         Ok(collection)
     }
 }
 
+#[derive(Debug)]
 pub struct Many<P, R> {
     pub(crate) parser: P,
     pub(crate) output: PhantomData<R>,
@@ -265,7 +257,7 @@ where
     R: Extend<P::ParseResult> + Default,
 {
     type ParseResult = R;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let mut collection = R::default();
         collection.extend(self.parser.iter(buf));
         Ok(collection)
@@ -282,6 +274,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct Many1<P, R> {
     pub(crate) parser: P,
     pub(crate) output: PhantomData<R>,
@@ -293,13 +286,11 @@ where
     R: Extend<P::ParseResult> + Default,
 {
     type ParseResult = R;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let mut collection = R::default();
-        let backup = *buf;
+        let mut backup = *buf;
         let mut iter = self.parser.iter(buf);
-        let first = iter.next().ok_or(ParseError {
-            position: slice_some(backup),
-        })?;
+        let first = iter.next().unwrap_or(self.parser.parse(&mut backup)?);
         collection.extend_one(first);
         collection.extend(iter);
         Ok(collection)
@@ -316,6 +307,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct SepBy<P1, P2, R> {
     pub(crate) parser: P1,
     pub(crate) sep: P2,
@@ -329,7 +321,7 @@ where
     R: Extend<P1::ParseResult> + Default,
 {
     type ParseResult = R;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+    fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let mut collection = R::default();
         let mut iter = self.parser.iter(buf);
         let first = iter.next().ok_or(ParseError {
@@ -343,7 +335,7 @@ where
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Or<P1, P2> {
     pub(crate) parser1: P1,
     pub(crate) parser2: P2,

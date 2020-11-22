@@ -1,20 +1,21 @@
 #![feature(bool_to_option)]
-#![feature(try_trait)]
 #![feature(extend_one)]
 pub mod combinator;
 pub mod parser;
 use combinator::*;
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
+#[derive(Copy, Debug, Clone, Eq, PartialEq)]
 pub struct ParseError<'a> {
     pub position: &'a str,
 }
+
 pub trait IntoParseError<T> {
     fn into_if_err<'a>(self, err: ParseError<'a>) -> Result<T, ParseError<'a>>;
 }
 impl<T> IntoParseError<T> for Option<T> {
     fn into_if_err<'a>(self, err: ParseError<'a>) -> Result<T, ParseError<'a>> {
-        self.ok_or_else(|| err)
+        self.ok_or(err)
     }
 }
 impl<T, E> IntoParseError<T> for Result<T, E> {
@@ -23,17 +24,12 @@ impl<T, E> IntoParseError<T> for Result<T, E> {
     }
 }
 pub fn slice_some(buf: &str) -> &str {
-    let end = buf
-        .char_indices()
-        .take_while(|(_, c)| *c != '\n')
-        .map(|(i, _)| i)
-        .take(20)
-        .last();
-    let end = match end {
-        None => 0,
-        Some(x) => x,
-    };
-    &buf[..end]
+    for (i, c) in buf.char_indices() {
+        if c == '\n' {
+            return &buf[..i];
+        }
+    }
+    &buf[..]
 }
 
 pub struct ParserIter<'a, 'b, P> {
@@ -49,10 +45,40 @@ where
         self.parser.parse(self.buf).ok()
     }
 }
+impl<'a, 'b, P> ParserIter<'a, 'b, P> {
+    pub fn with_result(self) -> ParseResultIter<'a, 'b, P> {
+        ParseResultIter {
+            parser: self.parser,
+            buf: self.buf,
+            end: false,
+        }
+    }
+}
+pub struct ParseResultIter<'a, 'b, P> {
+    pub(crate) parser: &'a P,
+    pub(crate) buf: &'a mut &'b str,
+    pub(crate) end: bool,
+}
+impl<'a, 'b, P> Iterator for ParseResultIter<'a, 'b, P>
+where
+    P: Parser,
+{
+    type Item = Result<P::ParseResult, ParseError<'b>>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.end {
+            return None;
+        }
+        let res = self.parser.parse(self.buf);
+        if res.is_err() {
+            self.end = true;
+        }
+        Some(res)
+    }
+}
 
 pub trait Parser: Copy + Clone {
     type ParseResult;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>>;
+    fn parse<'a, 'b>(&'a self, buf: &'a mut &'b str) -> Result<Self::ParseResult, ParseError<'b>>;
     fn iter<'a, 'b>(&'a self, buf: &'a mut &'b str) -> ParserIter<'a, 'b, Self> {
         ParserIter {
             parser: self,

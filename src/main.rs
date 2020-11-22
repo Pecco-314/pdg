@@ -1,4 +1,5 @@
 #![feature(label_break_value)]
+#![feature(bool_to_option)]
 mod details;
 mod parser;
 mod random;
@@ -10,7 +11,7 @@ use crate::{
 };
 use colour::*;
 use powershell_script;
-use simple_combinators::{ParseError, Parser};
+use simple_combinators::{combinator::attempt, ParseError, Parser};
 use std::{
     env, fs, io,
     io::ErrorKind,
@@ -20,13 +21,13 @@ use std::{
 };
 
 fn pause() {
-    println!("(Press any key to exit)");
+    println!("(Press Enter/Return to exit)");
     io::stdin().read_line(&mut String::new()).ignore();
 }
 
 fn parse_once(buf: &mut &str, is_first: bool) -> (Range<usize>, Vec<Token>, bool) {
     // 解析一个文件标注和其对应的模板
-    let range = file_range().parse(buf);
+    let range = attempt(file_range()).parse(buf);
     let mut end = false;
     let range = match range {
         Ok(r) => r,
@@ -39,25 +40,30 @@ fn parse_once(buf: &mut &str, is_first: bool) -> (Range<usize>, Vec<Token>, bool
             }
         } // 没有发现文件标注，如果尚未生成过，则默认生成1.in~10.in
     };
-    let tokens = token().iter(buf).collect();
-    let next_parse_result = token().parse(buf);
-    match next_parse_result {
-        Err(ParseError { position: pos }) if !pos.is_empty() => {
-            e_red!("error");
-            eprint!(": Something went wrong while parsing ",);
-            e_white_ln!("\"...{}...\"", pos);
-            exit(1);
-        }
-        _ => {}
-    }
+    let results = attempt(token()).iter(buf).with_result().collect();
+    let tokens = handle_parse_result(results);
     (range, tokens, end)
+}
+
+fn handle_parse_result(results: Vec<Result<Token, ParseError>>) -> Vec<Token> {
+    let err = results.last().ignore().as_ref().err().ignore(); // 最后一项永远是错误
+    if !err.position.is_empty() {
+        // pos若空则说明已到EOF // <- FIXIT:这样判断是不好的
+        e_red!("error");
+        eprint!(": Something went wrong while parsing ",);
+        e_white_ln!("\"...{}\"", err.position);
+        exit(1);
+    }
+    results[..results.len() - 1]
+        .iter()
+        .map(|r| r.as_ref().unwrap().clone())
+        .collect()
 }
 
 fn parse_and_generate(mut buf: &str, folder: PathBuf, config: &Config) {
     let mut is_first = true;
     loop {
         let (range, tokens, end) = parse_once(&mut buf, is_first);
-        // println!("{:?}", tokens);
         is_first = false;
         for i in range {
             generate(i, &tokens, &folder, config);
@@ -164,7 +170,7 @@ fn get_folder(template: &PathBuf, config: &Config) -> PathBuf {
 fn main() {
     let (path, template) = get_template();
     let mut buf = template.as_str();
-    let config = config().parse(&mut buf).ignore(); // 解析配置，此处不会panic
+    let config = config().parse(&mut buf).ignore(); // 解析配置
     let folder = get_folder(&path, &config);
     parse_and_generate(buf, folder, &config);
     if let Some(true) | None = config.pause {

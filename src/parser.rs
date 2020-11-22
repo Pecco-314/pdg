@@ -3,7 +3,7 @@ use crate::{
     token::{ConfigItem::*, Gen::*, Parameter::*, RandomString::*, Token::*, *},
 };
 use num::cast::ToPrimitive;
-use simple_combinators::{combinator::optional, parser::*, slice_some, ParseError, Parser};
+use simple_combinators::{combinator::optional, parser::*, ParseError, Parser};
 use std::ops::Range;
 
 pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
@@ -157,15 +157,7 @@ impl Parser for Repeated {
                 spaces().skip(char('}')).parse(buf)?;
             }
             Err(_) => {
-                v.push(
-                    token()
-                        .iter(buf)
-                        .next()
-                        .ok_or(ParseError {
-                            position: slice_some(buf),
-                        })?
-                        .clone(),
-                );
+                v.push(token().parse(buf)?);
             }
         };
         Ok(v)
