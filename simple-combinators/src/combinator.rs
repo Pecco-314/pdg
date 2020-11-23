@@ -46,8 +46,8 @@ pub fn satisfy<F>(satisfy_func: F) -> Satisfy<F> {
 }
 #[derive(Copy, Clone, Debug)]
 pub struct With<P1, P2> {
-    pub(crate) parser1: P1,
-    pub(crate) parser2: P2,
+    pub(crate) skip: P1,
+    pub(crate) with: P2,
 }
 
 impl<P1, P2> Parser for With<P1, P2>
@@ -57,16 +57,16 @@ where
 {
     type ParseResult = P2::ParseResult;
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
-        self.parser1.parse(buf)?;
-        let res = self.parser2.parse(buf)?;
+        self.skip.parse(buf)?;
+        let res = self.with.parse(buf)?;
         Ok(res)
     }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct Skip<P1, P2> {
-    pub(crate) parser1: P1,
-    pub(crate) parser2: P2,
+    pub(crate) with: P1,
+    pub(crate) skip: P2,
 }
 
 impl<P1, P2> Parser for Skip<P1, P2>
@@ -76,16 +76,16 @@ where
 {
     type ParseResult = P1::ParseResult;
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
-        let res = self.parser1.parse(buf)?;
-        self.parser2.parse(buf)?;
+        let res = self.with.parse(buf)?;
+        self.skip.parse(buf)?;
         Ok(res)
     }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct And<P1, P2> {
-    pub(crate) parser1: P1,
-    pub(crate) parser2: P2,
+    pub(crate) and1: P1,
+    pub(crate) and2: P2,
 }
 
 impl<P1, P2> Parser for And<P1, P2>
@@ -95,8 +95,8 @@ where
 {
     type ParseResult = (P1::ParseResult, P2::ParseResult);
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
-        let res1 = self.parser1.parse(buf)?;
-        let res2 = self.parser2.parse(buf)?;
+        let res1 = self.and1.parse(buf)?;
+        let res2 = self.and2.parse(buf)?;
         Ok((res1, res2))
     }
 }
@@ -143,7 +143,7 @@ where
 
 #[derive(Debug, Copy, Clone)]
 pub struct Attempt<P> {
-    parser: P,
+    attempt: P,
 }
 impl<P> Parser for Attempt<P>
 where
@@ -152,7 +152,7 @@ where
     type ParseResult = P::ParseResult;
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let backup = *buf;
-        let res = self.parser.parse(buf);
+        let res = self.attempt.parse(buf);
         if res.is_err() {
             *buf = backup;
         }
@@ -163,12 +163,12 @@ pub fn attempt<P>(parser: P) -> Attempt<P>
 where
     P: Parser,
 {
-    Attempt { parser: parser }
+    Attempt { attempt: parser }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct Optional<P> {
-    parser: P,
+    optional: P,
 }
 impl<P> Parser for Optional<P>
 where
@@ -177,7 +177,7 @@ where
     type ParseResult = Option<P::ParseResult>;
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let backup = *buf;
-        let res = self.parser.parse(buf);
+        let res = self.optional.parse(buf);
         if res.is_err() {
             *buf = backup;
         }
@@ -188,12 +188,12 @@ pub fn optional<P>(parser: P) -> Optional<P>
 where
     P: Parser,
 {
-    Optional { parser: parser }
+    Optional { optional: parser }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct Preview<P> {
-    parser: P,
+    preview: P,
 }
 impl<P> Parser for Preview<P>
 where
@@ -202,7 +202,7 @@ where
     type ParseResult = P::ParseResult;
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let backup = *buf;
-        let res = self.parser.parse(buf);
+        let res = self.preview.parse(buf);
         *buf = backup;
         res
     }
@@ -211,7 +211,7 @@ pub fn preview<P>(parser: P) -> Preview<P>
 where
     P: Parser,
 {
-    Preview { parser: parser }
+    Preview { preview: parser }
 }
 
 pub fn ignore<P>(parser: P) -> Map<P, impl Fn(P::ParseResult) + Copy>
@@ -223,7 +223,7 @@ where
 
 #[derive(Debug)]
 pub struct Repeat<P, R> {
-    pub(crate) parser: P,
+    pub(crate) repeat: P,
     pub(crate) times: usize,
     pub(crate) output: PhantomData<R>,
 }
@@ -235,7 +235,7 @@ where
 {
     type ParseResult = R;
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
-        let mut iter = self.parser.iter(buf).with_result();
+        let mut iter = self.repeat.iter(buf).with_result();
         let mut collection = R::default();
         for _ in 0..self.times {
             let cur = iter.next().unwrap()?;
@@ -247,7 +247,7 @@ where
 
 #[derive(Debug)]
 pub struct Many<P, R> {
-    pub(crate) parser: P,
+    pub(crate) many: P,
     pub(crate) output: PhantomData<R>,
 }
 impl_copy_and_clone!(Many<P;R>);
@@ -259,7 +259,7 @@ where
     type ParseResult = R;
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let mut collection = R::default();
-        collection.extend(self.parser.iter(buf));
+        collection.extend(self.many.iter(buf));
         Ok(collection)
     }
 }
@@ -269,14 +269,14 @@ where
     R: Extend<P::ParseResult> + Default,
 {
     Many {
-        parser: parser,
+        many: parser,
         output: PhantomData,
     }
 }
 
 #[derive(Debug)]
 pub struct Many1<P, R> {
-    pub(crate) parser: P,
+    pub(crate) many1: P,
     pub(crate) output: PhantomData<R>,
 }
 impl_copy_and_clone!(Many1<P;R>);
@@ -289,8 +289,8 @@ where
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
         let mut collection = R::default();
         let mut backup = *buf;
-        let mut iter = self.parser.iter(buf);
-        let first = iter.next().unwrap_or(self.parser.parse(&mut backup)?);
+        let mut iter = self.many1.iter(buf);
+        let first = iter.next().unwrap_or(self.many1.parse(&mut backup)?);
         collection.extend_one(first);
         collection.extend(iter);
         Ok(collection)
@@ -302,7 +302,7 @@ where
     R: Extend<P::ParseResult> + Default,
 {
     Many1 {
-        parser: parser,
+        many1: parser,
         output: PhantomData,
     }
 }
@@ -318,7 +318,7 @@ impl<P1, P2, R> Parser for SepBy<P1, P2, R>
 where
     P1: Parser,
     P2: Parser,
-    R: Extend<P1::ParseResult> + Default,
+    R: Extend<P1::ParseResult> + Default + std::fmt::Debug,
 {
     type ParseResult = R;
     fn parse<'b>(&self, buf: &mut &'b str) -> Result<Self::ParseResult, ParseError<'b>> {
@@ -328,17 +328,20 @@ where
             position: slice_some(buf),
         })?;
         collection.extend_one(first);
-        let sep = attempt(self.sep.with(self.parser));
-        let iter = sep.iter(buf);
+        let para = attempt(self.sep.with(self.parser));
+        let iter = para.iter(buf);
         collection.extend(iter);
+        if self.sep.parse(buf).is_ok() {
+            self.parser.parse(buf)?;
+        }
         Ok(collection)
     }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct Or<P1, P2> {
-    pub(crate) parser1: P1,
-    pub(crate) parser2: P2,
+    pub(crate) branch1: P1,
+    pub(crate) branch2: P2,
 }
 impl<P1, P2, R> Parser for Or<P1, P2>
 where
@@ -347,11 +350,11 @@ where
 {
     type ParseResult = R;
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
-        let res = attempt(self.parser1).parse(buf);
+        let res = self.branch1.parse(buf);
         if res.is_ok() {
             res
         } else {
-            self.parser2.parse(buf)
+            self.branch2.parse(buf)
         }
     }
 }

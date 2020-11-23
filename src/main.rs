@@ -11,7 +11,7 @@ use crate::{
 };
 use colour::*;
 use powershell_script;
-use simple_combinators::{combinator::attempt, ParseError, Parser};
+use simple_combinators::{ParseError, Parser};
 use std::{
     env, fs, io,
     io::ErrorKind,
@@ -27,7 +27,7 @@ fn pause() {
 
 fn parse_once(buf: &mut &str, is_first: bool) -> (Range<usize>, Vec<Token>, bool) {
     // 解析一个文件标注和其对应的模板
-    let range = attempt(file_range()).parse(buf);
+    let range = file_range().parse(buf);
     let mut end = false;
     let range = match range {
         Ok(r) => r,
@@ -40,7 +40,7 @@ fn parse_once(buf: &mut &str, is_first: bool) -> (Range<usize>, Vec<Token>, bool
             }
         } // 没有发现文件标注，如果尚未生成过，则默认生成1.in~10.in
     };
-    let results = attempt(token()).iter(buf).with_result().collect();
+    let results = token().iter(buf).with_result().collect();
     let tokens = handle_parse_result(results);
     (range, tokens, end)
 }
@@ -51,7 +51,7 @@ fn handle_parse_result(results: Vec<Result<Token, ParseError>>) -> Vec<Token> {
         // pos若空则说明已到EOF // <- FIXIT:这样判断是不好的
         e_red!("error");
         eprint!(": Something went wrong while parsing ",);
-        e_white_ln!("\"...{}\"", err.position);
+        e_white_ln!("\"{}\"", err.position);
         exit(1);
     }
     results[..results.len() - 1]
@@ -131,6 +131,7 @@ fn get_template<'a>() -> (PathBuf, String) {
         "template.txt" // 默认路径
     };
     (Path::new(path).to_path_buf(), {
+        // TODO: CRLF->LF
         let read_result = fs::read_to_string(path);
         match read_result {
             Ok(result) => result,

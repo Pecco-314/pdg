@@ -87,20 +87,20 @@ pub trait Parser: Copy + Clone {
     }
     fn with<P>(self, other: P) -> With<Self, P> {
         With {
-            parser1: self,
-            parser2: other,
+            skip: self,
+            with: other,
         }
     }
     fn skip<P>(self, other: P) -> Skip<Self, P> {
         Skip {
-            parser1: self,
-            parser2: other,
+            with: self,
+            skip: other,
         }
     }
     fn and<P>(self, other: P) -> And<Self, P> {
         And {
-            parser1: self,
-            parser2: other,
+            and1: self,
+            and2: other,
         }
     }
     fn between<L, R>(self, left: L, right: R) -> Skip<With<L, Self>, R>
@@ -132,7 +132,7 @@ pub trait Parser: Copy + Clone {
     }
     fn repeat<P>(self, times: usize) -> Repeat<Self, P> {
         Repeat {
-            parser: self,
+            repeat: self,
             times: times,
             output: PhantomData,
         }
@@ -146,8 +146,8 @@ pub trait Parser: Copy + Clone {
     }
     fn or<P>(self, other: P) -> Or<Self, P> {
         Or {
-            parser1: self,
-            parser2: other,
+            branch1: self,
+            branch2: other,
         }
     }
 }
