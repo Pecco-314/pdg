@@ -4,20 +4,12 @@ use crate::{
 };
 use num::cast::ToPrimitive;
 use rand::{seq::SliceRandom, thread_rng};
-macro_rules! distribute{
-    ($sum:expr; $($freq:expr, $func:expr);+)=>{{
-            let mut ans = None;
-            let mut cc = random_range!(0,$sum);
-            'lp:{$(
-                cc -= $freq;
-                if cc<0 {
-                    ans = Some($func()?);
-                    break 'lp;
-                }
-            )+
-            }
-            ans
-    }}
+macro_rules! distribute {
+    ($output:ty; $($freq:expr, $func:expr);+) => {{
+        let mut v: Vec<(usize, fn() -> Option<$output>)> = Vec::new();
+        $(v.push(($freq, $func)));+;
+        distribute(v)?()?
+    }};
 }
 
 #[macro_export]
@@ -34,6 +26,24 @@ macro_rules! random_range {
             thread_rng().gen_range($a, $b + 1)
         }
     };
+}
+
+fn distribute<I>(v: Vec<(usize, I)>) -> Option<I> {
+    let sum: usize = v.iter().map(|(i, _)| i).sum();
+    let target = random_range!(1, sum);
+    Some(
+        v.into_iter()
+            .fold_first(
+                |(i, x), (j, y)| {
+                    if i >= target {
+                        (i, x)
+                    } else {
+                        (i + j, y)
+                    }
+                },
+            )?
+            .1,
+    )
 }
 
 pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
@@ -89,7 +99,7 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
         Alpha(t) => {
             for _ in 0..resolve!(t, int).to_usize()? {
                 s.push(
-                    distribute!(52; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z'))?,
+                    distribute!(char; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z')),
                 );
             }
             Some(s)
@@ -97,20 +107,24 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
         Alnum(t) => {
             for _ in 0..resolve!(t, int).to_usize()? {
                 s.push(
-                    distribute!(62; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z'); 10, || random_char('0','9'))?,
+                    distribute!(char; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z'); 10, || random_char('0','9')),
                 );
             }
             Some(s)
         }
         HexLower(t) => {
             for _ in 0..resolve!(t, int).to_usize()? {
-                s.push(distribute!(16; 10, || random_char('0', '9'); 6, || random_char('a', 'f'))?);
+                s.push(
+                    distribute!(char; 10, || random_char('0', '9'); 6, || random_char('a', 'f')),
+                );
             }
             Some(s)
         }
         HexUpper(t) => {
             for _ in 0..resolve!(t, int).to_usize()? {
-                s.push(distribute!(16; 10, || random_char('0', '9'); 6, || random_char('A', 'F'))?);
+                s.push(
+                    distribute!(char; 10, || random_char('0', '9'); 6, || random_char('A', 'F')),
+                );
             }
             Some(s)
         }
