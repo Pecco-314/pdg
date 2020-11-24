@@ -51,9 +51,10 @@ where
     <I as FromStr>::Err: Error,
 {
     const EPS: f64 = 1e-10;
-    float()
-        .flat_map(|x| (x - x.trunc().abs() < EPS).then_some(I::from_f64(x)?)) // 小数部分足够小则解析成功
-        .or(many1(one_of("-0123456789")).flat_map(|s: String| s.parse::<I>())) // 解析失败则尝试只解析数字和负号
+    attempt(float().flat_map(|x| (x - x.trunc().abs() < EPS).then_some(I::from_f64(x)?))) // 小数部分足够小则解析成功
+        .or(attempt(
+            many1(one_of("-0123456789")).flat_map(|s: String| s.parse::<I>()), // 解析失败则尝试只解析数字和负号
+        ))
         .or(many1(one_of("0123456789")).flat_map(|s: String| s.parse::<I>())) // 再解析失败则尝试只解析数字
 }
 

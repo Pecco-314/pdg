@@ -1,5 +1,6 @@
-#![feature(label_break_value)]
+#![feature(iterator_fold_self)]
 #![feature(bool_to_option)]
+#![feature(label_break_value)]
 mod details;
 mod parser;
 mod random;
@@ -11,7 +12,11 @@ use crate::{
 };
 use colour::*;
 use powershell_script;
-use simple_combinators::{ParseError, Parser};
+use simple_combinators::{
+    combinator::{attempt, preview},
+    parser::string,
+    ParseError, Parser,
+};
 use std::{
     env, fs, io,
     io::ErrorKind,
@@ -40,14 +45,15 @@ fn parse_once(buf: &mut &str, is_first: bool) -> (Range<usize>, Vec<Token>, bool
             }
         } // 没有发现文件标注，如果尚未生成过，则默认生成1.in~10.in
     };
-    let results = token().iter(buf).with_result().collect();
+    let results = attempt(token()).iter(buf).with_result().collect();
     let tokens = handle_parse_result(results);
     (range, tokens, end)
 }
 
 fn handle_parse_result(results: Vec<Result<Token, ParseError>>) -> Vec<Token> {
     let err = results.last().ignore().as_ref().err().ignore(); // 最后一项永远是错误
-    if !err.position.is_empty() {
+    let mut position = err.position;
+    if !err.position.is_empty() && preview(string(":>")).parse(&mut position).is_err() {
         // pos若空则说明已到EOF // <- FIXIT:这样判断是不好的
         e_red!("error");
         eprint!(": Something went wrong while parsing ",);
@@ -111,16 +117,27 @@ fn generate(fileid: usize, tokens: &Vec<Token>, folder: &PathBuf, config: &Confi
 }
 fn run_std(folder: &PathBuf, output: &str, input: &str, std: &str) {
     println!("Generating {}", output);
-    powershell_script::run(
-        &format!(
-            "Get-Content {} | {} | Out-File {}",
-            folder.join(input).to_str().ignore(),
-            std,
-            folder.join(output).to_str().ignore(),
-        ),
-        false,
-    )
-    .unwrap_or_else(|_| error_info(&format!("Something went wrong while generating {}", input)));
+    let std_path = Path::new(std);
+    let std_parent = std_path
+        .parent()
+        .unwrap_or_else(|| error_info("Incorrect standard program path"));
+    let mut std_path = String::new();
+    if std_parent.parent().is_none() {
+        std_path.push_str("./") // 如果是单独的文件名，加一个./ （这段有没有更好的写法？）
+    };
+    std_path.push_str(std);
+    let script = &format!(
+        "Get-Content {} | {} | Out-File {} -Encoding default",
+        folder.join(input).to_str().ignore(),
+        std_path,
+        folder.join(output).to_str().ignore(),
+    );
+    powershell_script::run(script, false).unwrap_or_else(|_| {
+        error_info(&format!(
+            "Something went wrong while generating {}\nPlease check your standard program and the powershell script: {}",
+            input, script
+        ))
+    });
 }
 
 fn get_template<'a>() -> (PathBuf, String) {

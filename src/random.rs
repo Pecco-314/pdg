@@ -40,11 +40,11 @@ pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
     match op {
         Op::LessThan => {
             let (x, y) = random_pair(l1, r1, l2 - 1, r2 - 1, Op::NoGreaterThan);
-            (x, y)
+            (x, y + 1)
         }
         Op::GreaterThan => {
             let (x, y) = random_pair(l1, r1, l2 + 1, r2 + 1, Op::NoLessThan);
-            (x, y)
+            (x, y - 1)
         }
         Op::NoGreaterThan => {
             let r1 = r1.min(r2);
@@ -72,7 +72,7 @@ pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
 }
 
 pub fn random_char(l: char, r: char) -> Option<char> {
-    std::char::from_u32(random_range!(l as u32, r as u32 + 1))
+    std::char::from_u32(random_range!(l as u32, r as u32))
 }
 
 pub fn random_string(rs: &RandomString) -> Option<String> {
