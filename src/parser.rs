@@ -2,7 +2,6 @@ use crate::{
     resolve,
     token::{ConfigItem::*, Gen::*, Parameter::*, RandomString::*, Token::*, *},
 };
-use num::cast::ToPrimitive;
 use simple_combinators::{
     combinator::{attempt, many1, optional, preview, satisfy},
     parser::*,
@@ -246,8 +245,8 @@ struct DistributeToken;
 impl Parser for DistributeToken {
     type ParseResult = Token;
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
-        char('D').parse(buf)?;
-        spaces()
+        char('D')
+            .with(spaces())
             .with(
                 parameter()
                     .skip(spaces())
@@ -273,14 +272,14 @@ struct RepeatedTokenParser;
 impl Parser for RepeatedTokenParser {
     type ParseResult = Token;
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
-        char('X').parse(buf)?;
-        parameters()
+        char('X')
+            .with(parameters())
             .flat_map(|v| match &v[..] {
-                [Int(IntParameter::Confirm(a))] => Some(a.to_usize()?),
+                [Int(ip)] => Some(ip.clone()),
                 _ => None,
             })
             .and(token())
-            .map(|(times, token)| Gen(Repeat(times, Box::new(token))))
+            .map(|(ip, token)| Gen(Repeat(ip, Box::new(token))))
             .parse(buf)
     }
 }
@@ -293,14 +292,14 @@ struct ArrayTokenParser;
 impl Parser for ArrayTokenParser {
     type ParseResult = Token;
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
-        char('A').parse(buf)?;
-        parameters()
+        char('A')
+            .with(parameters())
             .flat_map(|v| match &v[..] {
-                [Int(IntParameter::Confirm(a))] => Some(a.to_usize()?),
+                [Int(ip)] => Some(ip.clone()),
                 _ => None,
             })
             .and(token())
-            .map(|(times, token)| Gen(Array(times, Box::new(token))))
+            .map(|(ip, token)| Gen(Array(ip, Box::new(token))))
             .parse(buf)
     }
 }

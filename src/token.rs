@@ -50,8 +50,8 @@ pub enum Gen {
     RandomInteger(RandomInteger),
     RandomString(RandomString),
     TokenGroup(Vec<Token>),
-    Repeat(usize, Box<Token>),
-    Array(usize, Box<Token>),
+    Repeat(IntParameter, Box<Token>),
+    Array(IntParameter, Box<Token>),
     Distribute(Vec<(IntParameter, Token)>),
     RandomIntegerPair(i64, i64, i64, i64, Op),
 }
@@ -170,20 +170,23 @@ impl Gen {
                 }
                 Some(Str(StrParameter::Confirm(s)))
             }
-            Repeat(times, token) => {
+            Repeat(ip, token) => {
                 let mut s = String::new();
-                for _ in 0..*times {
+                let times = resolve!(ip, size);
+                for _ in 0..times {
                     s.push_str(&token.gen()?.generate_str()?);
                 }
                 Some(Str(StrParameter::Confirm(s)))
             }
-            Array(times, v) => Some(Str(StrParameter::Confirm(
-                times.to_string().with('\n') + Repeat(*times, v.clone()).generate_str()?.as_str(),
-            ))),
+            Array(ip, v) => Some(Str(StrParameter::Confirm({
+                let times = resolve!(ip, size);
+                times.to_string().with('\n')
+                    + Repeat(ip.clone(), v.clone()).generate_str()?.as_str()
+            }))),
             Distribute(v) => {
                 let mut v2 = Vec::new();
                 for (ip, token) in v.iter() {
-                    v2.push((resolve!(ip, int).to_usize()?, token));
+                    v2.push((resolve!(ip, size), token));
                 }
                 let token = distribute(v2)?;
                 if let Token::Gen(gen) = token {

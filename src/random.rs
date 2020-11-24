@@ -91,13 +91,13 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
     match rs {
         OneOf(dict, t) => {
             let dict: Vec<char> = resolve!(dict, str, StrParameter).chars().collect();
-            for _ in 0..resolve!(t, int).to_usize()? {
+            for _ in 0..resolve!(t, size) {
                 s.push(*dict[..].choose(&mut thread_rng())?);
             }
             Some(s)
         }
         Alpha(t) => {
-            for _ in 0..resolve!(t, int).to_usize()? {
+            for _ in 0..resolve!(t, size) {
                 s.push(
                     distribute!(char; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z')),
                 );
@@ -105,7 +105,7 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
             Some(s)
         }
         Alnum(t) => {
-            for _ in 0..resolve!(t, int).to_usize()? {
+            for _ in 0..resolve!(t, size) {
                 s.push(
                     distribute!(char; 26, || random_char('a', 'z'); 26, || random_char('A', 'Z'); 10, || random_char('0','9')),
                 );
@@ -113,7 +113,7 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
             Some(s)
         }
         HexLower(t) => {
-            for _ in 0..resolve!(t, int).to_usize()? {
+            for _ in 0..resolve!(t, size) {
                 s.push(
                     distribute!(char; 10, || random_char('0', '9'); 6, || random_char('a', 'f')),
                 );
@@ -121,7 +121,7 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
             Some(s)
         }
         HexUpper(t) => {
-            for _ in 0..resolve!(t, int).to_usize()? {
+            for _ in 0..resolve!(t, size) {
                 s.push(
                     distribute!(char; 10, || random_char('0', '9'); 6, || random_char('A', 'F')),
                 );
@@ -129,7 +129,7 @@ pub fn random_string(rs: &RandomString) -> Option<String> {
             Some(s)
         }
         Between(l, r, t) => {
-            for _ in 0..resolve!(t, int).to_usize()? {
+            for _ in 0..resolve!(t, size) {
                 s.push(random_char(*l, *r)?);
             }
             Some(s)

@@ -32,6 +32,9 @@ impl With for String {}
 
 #[macro_export]
 macro_rules! resolve {
+    ($t:expr, size) => {
+        resolve!($t, int).to_usize()?
+    };
     ($t:expr, $ty:ident) => {
         match $t {
             Confirm(i) => i.clone(),
