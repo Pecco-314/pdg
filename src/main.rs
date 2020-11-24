@@ -54,7 +54,7 @@ fn handle_parse_result(results: Vec<Result<Token, ParseError>>) -> Vec<Token> {
     let err = results.last().ignore().as_ref().err().ignore(); // 最后一项永远是错误
     let mut position = err.position;
     if !err.position.is_empty() && preview(string(":>")).parse(&mut position).is_err() {
-        // pos若空则说明已到EOF // <- FIXIT:这样判断是不好的
+        // pos不为空，且接下来无文件标注，则说明发生了错误
         e_red!("error");
         eprint!(": Something went wrong while parsing ",);
         e_white_ln!("\"{}\"", err.position);

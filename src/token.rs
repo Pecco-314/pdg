@@ -1,9 +1,10 @@
 use crate::{
     details::With,
-    random::{random_pair, random_string},
+    random::{distribute, random_pair, random_string},
     random_range, resolve,
     token::{Gen::*, Parameter::*},
 };
+use num::ToPrimitive;
 
 #[derive(Clone, Debug)]
 pub enum ConfigItem {
@@ -48,8 +49,10 @@ pub enum Gen {
     ConstantString(String),
     RandomInteger(RandomInteger),
     RandomString(RandomString),
-    Repeat(usize, Vec<Token>),
-    Array(usize, Vec<Token>),
+    TokenGroup(Vec<Token>),
+    Repeat(usize, Box<Token>),
+    Array(usize, Box<Token>),
+    Distribute(Vec<(IntParameter, Token)>),
     RandomIntegerPair(i64, i64, i64, i64, Op),
 }
 #[derive(Copy, Clone, Debug)]
@@ -63,6 +66,14 @@ pub enum Op {
 pub enum Token {
     Gen(Gen),
     Op(Op),
+}
+impl Token {
+    fn gen(&self) -> Option<Gen> {
+        match self {
+            Token::Gen(gen) => Some(gen.clone()),
+            Token::Op(_) => None,
+        }
+    }
 }
 #[derive(Clone, Debug)]
 pub enum Parameter {
@@ -151,19 +162,36 @@ impl Gen {
                 0,
                 resolve!(r, int)
             )))),
-            Repeat(times, v) => {
+            TokenGroup(v) => {
                 let mut s = String::new();
                 let mut gens = cul_token(v)?;
+                for i in gens.iter_mut() {
+                    s.push_str(&i.generate_str()?);
+                }
+                Some(Str(StrParameter::Confirm(s)))
+            }
+            Repeat(times, token) => {
+                let mut s = String::new();
                 for _ in 0..*times {
-                    for i in gens.iter_mut() {
-                        s.push_str(&i.generate_str()?);
-                    }
+                    s.push_str(&token.gen()?.generate_str()?);
                 }
                 Some(Str(StrParameter::Confirm(s)))
             }
             Array(times, v) => Some(Str(StrParameter::Confirm(
                 times.to_string().with('\n') + Repeat(*times, v.clone()).generate_str()?.as_str(),
             ))),
+            Distribute(v) => {
+                let mut v2 = Vec::new();
+                for (ip, token) in v.iter() {
+                    v2.push((resolve!(ip, int).to_usize()?, token));
+                }
+                let token = distribute(v2)?;
+                if let Token::Gen(gen) = token {
+                    gen.generate()
+                } else {
+                    None
+                }
+            }
             RandomIntegerPair(l1, r1, l2, r2, op) => {
                 let (a, b) = random_pair(*l1, *r1, *l2, *r2, *op);
                 let mut s = a.to_string().with(' ');

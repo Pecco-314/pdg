@@ -28,7 +28,7 @@ macro_rules! random_range {
     };
 }
 
-fn distribute<I>(v: Vec<(usize, I)>) -> Option<I> {
+pub fn distribute<I>(v: Vec<(usize, I)>) -> Option<I> {
     let sum: usize = v.iter().map(|(i, _)| i).sum();
     let target = random_range!(1, sum);
     Some(

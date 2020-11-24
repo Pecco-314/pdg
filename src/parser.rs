@@ -4,7 +4,7 @@ use crate::{
 };
 use num::cast::ToPrimitive;
 use simple_combinators::{
-    combinator::{attempt, optional, preview, satisfy},
+    combinator::{attempt, many1, optional, preview, satisfy},
     parser::*,
     ParseError, Parser,
 };
@@ -85,6 +85,21 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
         })
 }
 
+pub fn token() -> impl Parser<ParseResult = Token> {
+    spaces()
+        .with(
+            attempt(constant())
+                .or(random_integer_token())
+                .or(random_string_token())
+                .or(repeated_token())
+                .or(array_token())
+                .or(distribute_token())
+                .or(token_group())
+                .or(cmp_op()),
+        )
+        .skip(spaces())
+}
+
 fn normal_parameter() -> impl Parser<ParseResult = Parameter> {
     attempt(quoted_string())
         .map(|s| Str(StrParameter::Confirm(s)))
@@ -121,6 +136,58 @@ fn quesmark_parameter() -> impl Parser<ParseResult = Parameter> {
                 },
             ))),
     )
+}
+
+fn random_integer_token() -> impl Parser<ParseResult = Token> {
+    use crate::token::RandomInteger::*;
+    char('i')
+        .with(attempt(parameters()))
+        .flat_map(|v| match &v[..] {
+            [Int(a)] => Some(Gen(RandomInteger(NoGreaterThan(a.clone())))),
+            [Int(a), Int(b)] => Some(Gen(RandomInteger(Between(a.clone(), b.clone())))),
+            _ => None,
+        })
+}
+
+fn random_string_token() -> impl Parser<ParseResult = Token> {
+    char('s')
+        .with(attempt(parameters()))
+        .flat_map(|v| match &v[..] {
+            [Int(t)] => Some(Gen(RandomString(Lower(t.clone())))),
+            [Enum(e), Int(t)] if e == "lower" => Some(Gen(RandomString(Lower(t.clone())))),
+            [Enum(e), Int(t)] if e == "upper" => Some(Gen(RandomString(Upper(t.clone())))),
+            [Enum(e), Int(t)] if e == "alpha" => Some(Gen(RandomString(Alpha(t.clone())))),
+            [Enum(e), Int(t)] if e == "bin" => Some(Gen(RandomString(Bin(t.clone())))),
+            [Enum(e), Int(t)] if e == "oct" => Some(Gen(RandomString(Oct(t.clone())))),
+            [Enum(e), Int(t)] if e == "dec" => Some(Gen(RandomString(Dec(t.clone())))),
+            [Enum(e), Int(t)] if e == "hexlower" => Some(Gen(RandomString(HexLower(t.clone())))),
+            [Enum(e), Int(t)] if e == "hexupper" => Some(Gen(RandomString(HexUpper(t.clone())))),
+            [Enum(e), Int(t)] if e == "alnum" => Some(Gen(RandomString(Alnum(t.clone())))),
+            [Enum(e), Int(t)] if e == "graph" => Some(Gen(RandomString(Graph(t.clone())))),
+            [Enum(e), Str(s), Int(t)] if e == "oneof" => {
+                Some(Gen(RandomString(OneOf(s.clone(), t.clone()))))
+            }
+            [Enum(e), Char(l), Char(r), Int(t)] if e == "between" => {
+                Some(Gen(RandomString(Between(*l, *r, t.clone()))))
+            }
+            _ => None,
+        })
+}
+
+pub fn cmp_op() -> impl Parser<ParseResult = Token> {
+    use crate::token::Op::*;
+    char('<')
+        .map(|_| Op(LessThan))
+        .or(char('>').map(|_| Op(GreaterThan)))
+        .or(string("<=").map(|_| Op(NoGreaterThan)))
+        .or(string(">=").map(|_| Op(NoLessThan)))
+}
+
+pub fn constant() -> impl Parser<ParseResult = Token> {
+    quoted_string()
+        .map(|s| Gen(ConstantString(s)))
+        .or(number().map(|i| Gen(ConstantInteger(i))))
+        .or(char('/').map(|_| Gen(NewLine)))
 }
 
 #[derive(Copy, Clone)]
@@ -160,113 +227,83 @@ fn parameters() -> impl Parser<ParseResult = Vec<Parameter>> {
 }
 
 #[derive(Copy, Clone)]
-struct Repeated;
-impl Parser for Repeated {
-    type ParseResult = Vec<Token>;
+struct TokenGroupParser;
+impl Parser for TokenGroupParser {
+    type ParseResult = Token;
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
-        let res = spaces().skip(char('{')).parse(buf);
-        let mut v = Vec::new();
-        match res {
-            Ok(_) => {
-                for i in attempt(token()).iter(buf) {
-                    v.push(i.clone());
-                }
-                spaces().skip(char('}')).parse(buf)?;
-            }
-            Err(_) => {
-                v.push(token().parse(buf)?);
-            }
-        };
-        Ok(v)
+        many1(token())
+            .between(char('{').skip(spaces()), spaces().with(char('}')))
+            .map(|v| Gen(TokenGroup(v)))
+            .parse(buf)
     }
 }
-fn repeated() -> impl Parser<ParseResult = Vec<Token>> {
-    Repeated
+fn token_group() -> impl Parser<ParseResult = Token> {
+    TokenGroupParser
 }
 
-fn random_integer_token() -> impl Parser<ParseResult = Token> {
-    use crate::token::RandomInteger::*;
-    char('i')
-        .with(attempt(parameters()))
-        .flat_map(|v| match &v[..] {
-            [Int(a)] => Some(Gen(RandomInteger(NoGreaterThan(a.clone())))),
-            [Int(a), Int(b)] => Some(Gen(RandomInteger(Between(a.clone(), b.clone())))),
-            _ => None,
-        })
+#[derive(Copy, Clone)]
+struct DistributeToken;
+impl Parser for DistributeToken {
+    type ParseResult = Token;
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+        char('D').parse(buf)?;
+        spaces()
+            .with(
+                parameter()
+                    .skip(spaces())
+                    .skip(char(':'))
+                    .and(token())
+                    .flat_map(|(p, t)| match p {
+                        Int(i) => Some((i, t)),
+                        _ => None,
+                    })
+                    .sep_by(spaces().skip(char(',')).skip(spaces()))
+                    .between(char('{').skip(spaces()), spaces().with(char('}')))
+                    .map(|v| Gen(Distribute(v))),
+            )
+            .parse(buf)
+    }
+}
+fn distribute_token() -> impl Parser<ParseResult = Token> {
+    DistributeToken
 }
 
-fn random_string_token() -> impl Parser<ParseResult = Token> {
-    char('s')
-        .with(attempt(parameters()))
-        .flat_map(|v| match &v[..] {
-            [Int(t)] => Some(Gen(RandomString(Lower(t.clone())))),
-            [Enum(e), Int(t)] if e == "lower" => Some(Gen(RandomString(Lower(t.clone())))),
-            [Enum(e), Int(t)] if e == "upper" => Some(Gen(RandomString(Upper(t.clone())))),
-            [Enum(e), Int(t)] if e == "alpha" => Some(Gen(RandomString(Alpha(t.clone())))),
-            [Enum(e), Int(t)] if e == "bin" => Some(Gen(RandomString(Bin(t.clone())))),
-            [Enum(e), Int(t)] if e == "oct" => Some(Gen(RandomString(Oct(t.clone())))),
-            [Enum(e), Int(t)] if e == "dec" => Some(Gen(RandomString(Dec(t.clone())))),
-            [Enum(e), Int(t)] if e == "hexlower" => Some(Gen(RandomString(HexLower(t.clone())))),
-            [Enum(e), Int(t)] if e == "hexupper" => Some(Gen(RandomString(HexUpper(t.clone())))),
-            [Enum(e), Int(t)] if e == "alnum" => Some(Gen(RandomString(Alnum(t.clone())))),
-            [Enum(e), Int(t)] if e == "graph" => Some(Gen(RandomString(Graph(t.clone())))),
-            [Enum(e), Str(s), Int(t)] if e == "oneof" => {
-                Some(Gen(RandomString(OneOf(s.clone(), t.clone()))))
-            }
-            [Enum(e), Char(l), Char(r), Int(t)] if e == "between" => {
-                Some(Gen(RandomString(Between(*l, *r, t.clone()))))
-            }
-            _ => None,
-        })
+#[derive(Copy, Clone)]
+struct RepeatedTokenParser;
+impl Parser for RepeatedTokenParser {
+    type ParseResult = Token;
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+        char('X').parse(buf)?;
+        parameters()
+            .flat_map(|v| match &v[..] {
+                [Int(IntParameter::Confirm(a))] => Some(a.to_usize()?),
+                _ => None,
+            })
+            .and(token())
+            .map(|(times, token)| Gen(Repeat(times, Box::new(token))))
+            .parse(buf)
+    }
 }
-
 fn repeated_token() -> impl Parser<ParseResult = Token> {
-    char('X')
-        .with(parameters())
-        .flat_map(|v| match &v[..] {
-            [Int(IntParameter::Confirm(a))] => Some(a.to_usize()?),
-            _ => None,
-        })
-        .and(repeated())
-        .map(|(times, v)| Gen(Repeat(times, v)))
+    RepeatedTokenParser
 }
 
+#[derive(Copy, Clone)]
+struct ArrayTokenParser;
+impl Parser for ArrayTokenParser {
+    type ParseResult = Token;
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+        char('A').parse(buf)?;
+        parameters()
+            .flat_map(|v| match &v[..] {
+                [Int(IntParameter::Confirm(a))] => Some(a.to_usize()?),
+                _ => None,
+            })
+            .and(token())
+            .map(|(times, token)| Gen(Array(times, Box::new(token))))
+            .parse(buf)
+    }
+}
 fn array_token() -> impl Parser<ParseResult = Token> {
-    char('A')
-        .with(parameters())
-        .flat_map(|v| match &v[..] {
-            [Int(IntParameter::Confirm(a))] => Some(a.to_usize()?),
-            _ => None,
-        })
-        .and(repeated())
-        .map(|(times, v)| Gen(Array(times, v)))
-}
-
-pub fn cmp_op() -> impl Parser<ParseResult = Token> {
-    use crate::token::Op::*;
-    char('<')
-        .map(|_| Op(LessThan))
-        .or(char('>').map(|_| Op(GreaterThan)))
-        .or(string("<=").map(|_| Op(NoGreaterThan)))
-        .or(string(">=").map(|_| Op(NoLessThan)))
-}
-
-pub fn constant() -> impl Parser<ParseResult = Token> {
-    quoted_string()
-        .map(|s| Gen(ConstantString(s)))
-        .or(number().map(|i| Gen(ConstantInteger(i))))
-        .or(char('/').map(|_| Gen(NewLine)))
-}
-
-pub fn token() -> impl Parser<ParseResult = Token> {
-    spaces()
-        .with(
-            attempt(constant())
-                .or(random_integer_token())
-                .or(random_string_token())
-                .or(repeated_token())
-                .or(array_token())
-                .or(cmp_op()),
-        )
-        .skip(spaces())
+    ArrayTokenParser
 }
