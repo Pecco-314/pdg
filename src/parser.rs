@@ -1,70 +1,40 @@
 use crate::{
-    resolve,
-    token::{ConfigItem::*, Parameter::*, RandomString::*, Token::*, *},
+    details::warning_info,
+    token::{Parameter::*, RandomString::*, Token::*, *},
 };
 use simple_combinators::{
     combinator::{attempt, many1, optional, preview, satisfy},
     parser::*,
     ParseError, Parser,
 };
-use std::ops::Range;
+use std::{collections::HashMap, ops::Range};
 
-pub fn config_item() -> impl Parser<ParseResult = ConfigItem> {
-    use StrParameter::*;
-    spaces()
-        .with(
-            string("#folder")
-                .with(parameters())
-                .flat_map(|v| match &v[..] {
-                    [Str(s)] => Some(Folder(resolve!(s, str))),
-                    _ => None,
-                })
-                .or(string("#pause")
-                    .with(parameters())
-                    .flat_map(|v| match &v[..] {
-                        [Bool(b)] => Some(Pause(*b)),
-                        _ => None,
-                    }))
-                .or(string("#std")
-                    .with(parameters())
-                    .flat_map(|v| match &v[..] {
-                        [Str(s)] => Some(Std(resolve!(s, str))),
-                        _ => None,
-                    }))
-                .or(string("#prefix")
-                    .with(parameters())
-                    .flat_map(|v| match &v[..] {
-                        [Str(s)] => Some(Prefix(resolve!(s, str))),
-                        _ => None,
-                    })),
-        )
-        .skip(spaces())
-}
-#[derive(Copy, Clone, Debug)]
+static REGISTER: &[&str] = &["prefix", "pause", "folder", "std"];
+#[derive(Copy, Clone)]
 struct ConfigParser;
 impl Parser for ConfigParser {
     type ParseResult = Config;
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
-        let mut config = Config {
-            ..Default::default()
-        };
-        for item in config_item().iter(buf) {
-            match item {
-                Folder(s) => {
-                    config.folder = Some(s);
+        let mut map = HashMap::new();
+        let config_item = spaces()
+            .skip(char('#'))
+            .with(word())
+            .and(optional(parameters()));
+        for (k, op) in config_item.iter(buf) {
+            if !REGISTER.contains(&k.as_str()) {
+                warning_info(&format!("unsupported config: {}", k));
+            }
+            match op {
+                Some(v) => {
+                    map.insert(k, v);
                 }
-                Pause(b) => {
-                    config.pause = Some(b);
-                }
-                Prefix(b) => {
-                    config.prefix = Some(b);
-                }
-                Std(b) => {
-                    config.std = Some(b);
-                }
+                None => warning_info(&format!(
+                    "Config '{}' does not have parameters with correct formats",
+                    k
+                )),
             }
         }
-        Ok(config)
+        Ok(map)
     }
 }
 pub fn config() -> impl Parser<ParseResult = Config> {
@@ -113,36 +83,24 @@ pub fn integer_pair_token() -> impl Parser<ParseResult = Token> {
         )
         .and(random_integer())
         .flat_map(|tuple| match tuple {
-            ((t1, "<"), t2) => Some(RandomIntegerPair(
+            ((t1, op), t2) => Some(RandomIntegerPair(
                 t1.left(),
                 t1.right(),
                 t2.left(),
                 t2.right(),
-                Cmp::LessThan,
+                match_op(op)?,
             )),
-            ((t1, ">"), t2) => Some(RandomIntegerPair(
-                t1.left(),
-                t1.right(),
-                t2.left(),
-                t2.right(),
-                Cmp::GreaterThan,
-            )),
-            ((t1, "<="), t2) => Some(RandomIntegerPair(
-                t1.left(),
-                t1.right(),
-                t2.left(),
-                t2.right(),
-                Cmp::NoGreaterThan,
-            )),
-            ((t1, ">="), t2) => Some(RandomIntegerPair(
-                t1.left(),
-                t1.right(),
-                t2.left(),
-                t2.right(),
-                Cmp::NoLessThan,
-            )),
-            _ => None,
         })
+}
+
+fn match_op(op: &str) -> Option<Cmp> {
+    match op {
+        "<" => Some(Cmp::LessThan),
+        ">" => Some(Cmp::GreaterThan),
+        "<=" => Some(Cmp::NoGreaterThan),
+        ">=" => Some(Cmp::NoLessThan),
+        _ => None,
+    }
 }
 
 fn normal_parameter() -> impl Parser<ParseResult = Parameter> {

@@ -5,23 +5,9 @@ use crate::{
     token::{Parameter::*, Token::*},
 };
 use num::ToPrimitive;
+use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
-pub enum ConfigItem {
-    Folder(String),
-    Pause(bool),
-    Prefix(String),
-    Std(String),
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Config {
-    pub folder: Option<String>,
-    pub pause: Option<bool>,
-    pub prefix: Option<String>,
-    pub std: Option<String>,
-}
-
+pub type Config = HashMap<String, Vec<Parameter>>;
 #[derive(Clone, Debug)]
 pub enum RandomString {
     Lower(IntParameter),

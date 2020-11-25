@@ -1,4 +1,5 @@
-use colour::e_red;
+use crate::token::{Config, Parameter::*};
+use colour::{e_red, e_yellow};
 use std::process::exit;
 pub trait Push {
     fn push(&mut self, c: char);
@@ -70,4 +71,43 @@ pub fn error_info(info: &str) -> ! {
     eprint!(": ");
     eprintln!("{}", info);
     exit(1);
+}
+pub fn warning_info(info: &str) {
+    e_yellow!("warning");
+    eprint!(": ");
+    eprintln!("{}", info);
+}
+
+pub trait GetParameter {
+    fn get_str<'a>(&self, s: &'a str) -> Option<String>;
+    fn get_bool<'a>(&self, s: &'a str) -> Option<bool>;
+}
+impl GetParameter for Config {
+    fn get_str<'a>(&self, s: &'a str) -> Option<String> {
+        use crate::token::StrParameter::*;
+        let ps = self.get(s)?;
+        match &ps[..] {
+            [Str(val)] => Some(resolve!(val, str)),
+            _ => {
+                warning_info(&format!(
+                    "The config '{}' has mismatched parameters (expected Str)",
+                    s
+                ));
+                None
+            }
+        }
+    }
+    fn get_bool<'a>(&self, s: &'a str) -> Option<bool> {
+        let ps = self.get(s)?;
+        match &ps[..] {
+            [Bool(val)] => Some(*val),
+            _ => {
+                warning_info(&format!(
+                    "The config '{}' has mismatched parameters (expected Bool)",
+                    s
+                ));
+                None
+            }
+        }
+    }
 }

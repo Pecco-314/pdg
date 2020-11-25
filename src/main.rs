@@ -6,7 +6,7 @@ mod parser;
 mod random;
 mod token;
 use crate::{
-    details::{error_info, Ignore},
+    details::{error_info, GetParameter, Ignore},
     parser::{config, file_range, token},
     token::{Config, Token},
 };
@@ -82,11 +82,7 @@ fn parse_and_generate(mut buf: &str, folder: PathBuf, config: &Config) {
 }
 
 fn generate(fileid: usize, tokens: &Vec<Token>, folder: &PathBuf, config: &Config) {
-    let prefix = if let Some(prefix) = &config.prefix {
-        prefix
-    } else {
-        ""
-    };
+    let prefix = config.get_str("prefix").unwrap_or(String::new());
     let filename = format!("{}{}.in", prefix, fileid);
     println!("Generating {}", filename);
     let target = folder.join(&filename);
@@ -107,10 +103,10 @@ fn generate(fileid: usize, tokens: &Vec<Token>, folder: &PathBuf, config: &Confi
             "Some unknown error occurred while trying to write generated results to the file",
         ),
     });
-    if let Some(std) = &config.std {
+    if let Some(std) = config.get_str("std") {
         let output = format!("{}{}.out", prefix, fileid);
         let input = &filename;
-        run_std(&folder, &output, &input, std);
+        run_std(&folder, &output, &input, &std);
     }
 }
 fn run_std(folder: &PathBuf, output: &str, input: &str, std: &str) {
@@ -167,11 +163,12 @@ fn get_template<'a>() -> (PathBuf, String) {
 }
 
 fn get_folder(template: &PathBuf, config: &Config) -> PathBuf {
-    let folder = if let Some(s) = &config.folder {
-        Path::new(&s).to_path_buf() // 如果重定向了输出文件夹则应用
-    } else {
-        template.parent().ignore().join("testdata")
-    };
+    let folder = config.get_str("folder").map_or_else(
+        || template.parent().ignore().join("testdata"),
+        |s| {
+            Path::new(&s).to_path_buf() // 如果重定向了输出文件夹则应用
+        },
+    );
     match fs::create_dir_all(&folder) {
         Ok(()) => folder,
         Err(e) if e.kind() == ErrorKind::PermissionDenied => error_info(
@@ -189,7 +186,7 @@ fn main() {
     let config = config().parse(&mut buf).ignore(); // 解析配置
     let folder = get_folder(&path, &config);
     parse_and_generate(buf, folder, &config);
-    if let Some(true) | None = config.pause {
+    if config.get_bool("pause").unwrap_or(false) {
         pause();
     }
 }
