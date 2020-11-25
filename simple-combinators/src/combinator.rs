@@ -331,9 +331,7 @@ where
         let para = attempt(self.sep.with(self.parser));
         let iter = para.iter(buf);
         collection.extend(iter);
-        if self.sep.parse(buf).is_ok() {
-            self.parser.parse(buf)?;
-        }
+        optional(self.sep).parse(buf)?;
         Ok(collection)
     }
 }
