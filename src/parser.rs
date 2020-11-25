@@ -1,6 +1,6 @@
 use crate::{
     resolve,
-    token::{ConfigItem::*, Gen::*, Parameter::*, RandomString::*, Token::*, *},
+    token::{ConfigItem::*, Parameter::*, RandomString::*, Token::*, *},
 };
 use simple_combinators::{
     combinator::{attempt, many1, optional, preview, satisfy},
@@ -88,15 +88,61 @@ pub fn token() -> impl Parser<ParseResult = Token> {
     spaces()
         .with(
             attempt(constant())
+                .or(attempt(integer_pair_token()))
                 .or(random_integer_token())
                 .or(random_string_token())
                 .or(repeated_token())
                 .or(array_token())
                 .or(distribute_token())
-                .or(token_group())
-                .or(cmp_op()),
+                .or(token_group()),
         )
         .skip(spaces())
+}
+
+pub fn integer_pair_token() -> impl Parser<ParseResult = Token> {
+    random_integer()
+        .and(
+            spaces()
+                .with(
+                    string("<")
+                        .or(string(">"))
+                        .or(string("<="))
+                        .or(string(">=")),
+                )
+                .skip(spaces()),
+        )
+        .and(random_integer())
+        .flat_map(|tuple| match tuple {
+            ((t1, "<"), t2) => Some(RandomIntegerPair(
+                t1.left(),
+                t1.right(),
+                t2.left(),
+                t2.right(),
+                Cmp::LessThan,
+            )),
+            ((t1, ">"), t2) => Some(RandomIntegerPair(
+                t1.left(),
+                t1.right(),
+                t2.left(),
+                t2.right(),
+                Cmp::GreaterThan,
+            )),
+            ((t1, "<="), t2) => Some(RandomIntegerPair(
+                t1.left(),
+                t1.right(),
+                t2.left(),
+                t2.right(),
+                Cmp::NoGreaterThan,
+            )),
+            ((t1, ">="), t2) => Some(RandomIntegerPair(
+                t1.left(),
+                t1.right(),
+                t2.left(),
+                t2.right(),
+                Cmp::NoLessThan,
+            )),
+            _ => None,
+        })
 }
 
 fn normal_parameter() -> impl Parser<ParseResult = Parameter> {
@@ -108,85 +154,66 @@ fn normal_parameter() -> impl Parser<ParseResult = Parameter> {
 fn exclmark_parameter() -> impl Parser<ParseResult = Parameter> {
     char('!').with(
         random_string_token()
-            .flat_map(|token| match token {
-                Gen(gen) => Some(gen.generate()?),
-                _ => None,
-            })
-            .or(attempt(random_integer_token().flat_map(
-                |token| match token {
-                    Gen(gen) => Some(gen.generate()?),
-                    _ => None,
-                },
-            ))),
+            .flat_map(|token| token.generate())
+            .or(attempt(
+                random_integer_token().flat_map(|token| token.generate()),
+            )),
     )
 }
 
 fn quesmark_parameter() -> impl Parser<ParseResult = Parameter> {
     char('?').with(
         random_string_token()
-            .flat_map(|token| match token {
-                Gen(gen) => Some(Str(StrParameter::Lazy(Box::new(gen)))),
-                _ => None,
-            })
-            .or(attempt(random_integer_token().flat_map(
-                |token| match token {
-                    Gen(gen) => Some(Int(IntParameter::Lazy(Box::new(gen)))),
-                    _ => None,
-                },
-            ))),
+            .map(|token| (Str(StrParameter::Lazy(Box::new(token)))))
+            .or(random_integer_token().map(|token| Int(IntParameter::Lazy(Box::new(token))))),
     )
 }
 
-fn random_integer_token() -> impl Parser<ParseResult = Token> {
+fn random_integer() -> impl Parser<ParseResult = crate::token::RandomInteger> {
     use crate::token::RandomInteger::*;
     char('i')
         .with(attempt(parameters()))
         .flat_map(|v| match &v[..] {
-            [Int(a)] => Some(Gen(RandomInteger(NoGreaterThan(a.clone())))),
-            [Int(a), Int(b)] => Some(Gen(RandomInteger(Between(a.clone(), b.clone())))),
+            [Int(a)] => Some(NoGreaterThan(a.clone())),
+            [Int(a), Int(b)] => Some(Between(a.clone(), b.clone())),
             _ => None,
         })
+}
+
+fn random_integer_token() -> impl Parser<ParseResult = Token> {
+    random_integer().map(|r| Token::RandomInteger(r))
 }
 
 fn random_string_token() -> impl Parser<ParseResult = Token> {
     char('s')
         .with(attempt(parameters()))
         .flat_map(|v| match &v[..] {
-            [Int(t)] => Some(Gen(RandomString(Lower(t.clone())))),
-            [Enum(e), Int(t)] if e == "lower" => Some(Gen(RandomString(Lower(t.clone())))),
-            [Enum(e), Int(t)] if e == "upper" => Some(Gen(RandomString(Upper(t.clone())))),
-            [Enum(e), Int(t)] if e == "alpha" => Some(Gen(RandomString(Alpha(t.clone())))),
-            [Enum(e), Int(t)] if e == "bin" => Some(Gen(RandomString(Bin(t.clone())))),
-            [Enum(e), Int(t)] if e == "oct" => Some(Gen(RandomString(Oct(t.clone())))),
-            [Enum(e), Int(t)] if e == "dec" => Some(Gen(RandomString(Dec(t.clone())))),
-            [Enum(e), Int(t)] if e == "hexlower" => Some(Gen(RandomString(HexLower(t.clone())))),
-            [Enum(e), Int(t)] if e == "hexupper" => Some(Gen(RandomString(HexUpper(t.clone())))),
-            [Enum(e), Int(t)] if e == "alnum" => Some(Gen(RandomString(Alnum(t.clone())))),
-            [Enum(e), Int(t)] if e == "graph" => Some(Gen(RandomString(Graph(t.clone())))),
+            [Int(t)] => Some(RandomString(Lower(t.clone()))),
+            [Enum(e), Int(t)] if e == "lower" => Some(RandomString(Lower(t.clone()))),
+            [Enum(e), Int(t)] if e == "upper" => Some(RandomString(Upper(t.clone()))),
+            [Enum(e), Int(t)] if e == "alpha" => Some(RandomString(Alpha(t.clone()))),
+            [Enum(e), Int(t)] if e == "bin" => Some(RandomString(Bin(t.clone()))),
+            [Enum(e), Int(t)] if e == "oct" => Some(RandomString(Oct(t.clone()))),
+            [Enum(e), Int(t)] if e == "dec" => Some(RandomString(Dec(t.clone()))),
+            [Enum(e), Int(t)] if e == "hexlower" => Some(RandomString(HexLower(t.clone()))),
+            [Enum(e), Int(t)] if e == "hexupper" => Some(RandomString(HexUpper(t.clone()))),
+            [Enum(e), Int(t)] if e == "alnum" => Some(RandomString(Alnum(t.clone()))),
+            [Enum(e), Int(t)] if e == "graph" => Some(RandomString(Graph(t.clone()))),
             [Enum(e), Str(s), Int(t)] if e == "oneof" => {
-                Some(Gen(RandomString(OneOf(s.clone(), t.clone()))))
+                Some(RandomString(OneOf(s.clone(), t.clone())))
             }
             [Enum(e), Char(l), Char(r), Int(t)] if e == "between" => {
-                Some(Gen(RandomString(Between(*l, *r, t.clone()))))
+                Some(RandomString(Between(*l, *r, t.clone())))
             }
             _ => None,
         })
 }
 
-pub fn cmp_op() -> impl Parser<ParseResult = Token> {
-    use crate::token::Op::*;
-    char('<')
-        .map(|_| Op(LessThan))
-        .or(char('>').map(|_| Op(GreaterThan)))
-        .or(string("<=").map(|_| Op(NoGreaterThan)))
-        .or(string(">=").map(|_| Op(NoLessThan)))
-}
-
 pub fn constant() -> impl Parser<ParseResult = Token> {
     quoted_string()
-        .map(|s| Gen(ConstantString(s)))
-        .or(number().map(|i| Gen(ConstantInteger(i))))
-        .or(char('/').map(|_| Gen(NewLine)))
+        .map(|s| ConstantString(s))
+        .or(number().map(|i| ConstantInteger(i)))
+        .or(char('/').map(|_| NewLine))
 }
 
 #[derive(Copy, Clone)]
@@ -232,7 +259,7 @@ impl Parser for TokenGroupParser {
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         many1(token())
             .between(char('{').skip(spaces()), spaces().with(char('}')))
-            .map(|v| Gen(TokenGroup(v)))
+            .map(|v| TokenGroup(v))
             .parse(buf)
     }
 }
@@ -256,9 +283,9 @@ impl Parser for DistributeToken {
                         Int(i) => Some((i, t)),
                         _ => None,
                     })
-                    .sep_by(spaces().skip(char(',')).skip(spaces()))
+                    .sep_by(spaces().skip(char(';')).skip(spaces()))
                     .between(char('{').skip(spaces()), spaces().with(char('}')))
-                    .map(|v| Gen(Distribute(v))),
+                    .map(|v| Distribute(v)),
             )
             .parse(buf)
     }
@@ -279,7 +306,7 @@ impl Parser for RepeatedTokenParser {
                 _ => None,
             })
             .and(token())
-            .map(|(ip, token)| Gen(Repeat(ip, Box::new(token))))
+            .map(|(ip, token)| Repeat(ip, Box::new(token)))
             .parse(buf)
     }
 }
@@ -299,7 +326,7 @@ impl Parser for ArrayTokenParser {
                 _ => None,
             })
             .and(token())
-            .map(|(ip, token)| Gen(Array(ip, Box::new(token))))
+            .map(|(ip, token)| Array(ip, Box::new(token)))
             .parse(buf)
     }
 }

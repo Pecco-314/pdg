@@ -1,6 +1,6 @@
 use crate::{
     resolve,
-    token::{Op, RandomString, RandomString::*, *},
+    token::{RandomString, RandomString::*, *},
 };
 use num::cast::ToPrimitive;
 use rand::{seq::SliceRandom, thread_rng};
@@ -46,17 +46,17 @@ pub fn distribute<I>(v: Vec<(usize, I)>) -> Option<I> {
     )
 }
 
-pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
+pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Cmp) -> (i64, i64) {
     match op {
-        Op::LessThan => {
-            let (x, y) = random_pair(l1, r1, l2 - 1, r2 - 1, Op::NoGreaterThan);
+        Cmp::LessThan => {
+            let (x, y) = random_pair(l1, r1, l2 - 1, r2 - 1, Cmp::NoGreaterThan);
             (x, y + 1)
         }
-        Op::GreaterThan => {
-            let (x, y) = random_pair(l1, r1, l2 + 1, r2 + 1, Op::NoLessThan);
+        Cmp::GreaterThan => {
+            let (x, y) = random_pair(l1, r1, l2 + 1, r2 + 1, Cmp::NoLessThan);
             (x, y - 1)
         }
-        Op::NoGreaterThan => {
+        Cmp::NoGreaterThan => {
             let r1 = r1.min(r2);
             let l2 = l2.max(l1);
             loop {
@@ -67,7 +67,7 @@ pub fn random_pair(l1: i64, r1: i64, l2: i64, r2: i64, op: Op) -> (i64, i64) {
                 }
             }
         }
-        Op::NoLessThan => {
+        Cmp::NoLessThan => {
             let r2 = r1.min(r2);
             let l1 = l2.max(l1);
             loop {

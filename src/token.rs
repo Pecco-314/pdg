@@ -2,7 +2,7 @@ use crate::{
     details::With,
     random::{distribute, random_pair, random_string},
     random_range, resolve,
-    token::{Gen::*, Parameter::*},
+    token::{Parameter::*, Token::*},
 };
 use num::ToPrimitive;
 
@@ -42,8 +42,29 @@ pub enum RandomInteger {
     Between(IntParameter, IntParameter),
     NoGreaterThan(IntParameter),
 }
+impl RandomInteger {
+    pub fn left(&self) -> IntParameter {
+        match self {
+            RandomInteger::Between(l, _) => l.clone(),
+            RandomInteger::NoGreaterThan(_) => IntParameter::Confirm(0),
+        }
+    }
+    pub fn right(&self) -> IntParameter {
+        match self {
+            RandomInteger::Between(_, r) => r.clone(),
+            RandomInteger::NoGreaterThan(r) => r.clone(),
+        }
+    }
+}
+#[derive(Copy, Clone, Debug)]
+pub enum Cmp {
+    LessThan,
+    GreaterThan,
+    NoLessThan,
+    NoGreaterThan,
+}
 #[derive(Clone, Debug)]
-pub enum Gen {
+pub enum Token {
     NewLine,
     ConstantInteger(i64),
     ConstantString(String),
@@ -53,27 +74,7 @@ pub enum Gen {
     Repeat(IntParameter, Box<Token>),
     Array(IntParameter, Box<Token>),
     Distribute(Vec<(IntParameter, Token)>),
-    RandomIntegerPair(i64, i64, i64, i64, Op),
-}
-#[derive(Copy, Clone, Debug)]
-pub enum Op {
-    LessThan,
-    GreaterThan,
-    NoLessThan,
-    NoGreaterThan,
-}
-#[derive(Clone, Debug)]
-pub enum Token {
-    Gen(Gen),
-    Op(Op),
-}
-impl Token {
-    fn gen(&self) -> Option<Gen> {
-        match self {
-            Token::Gen(gen) => Some(gen.clone()),
-            Token::Op(_) => None,
-        }
-    }
+    RandomIntegerPair(IntParameter, IntParameter, IntParameter, IntParameter, Cmp),
 }
 #[derive(Clone, Debug)]
 pub enum Parameter {
@@ -104,50 +105,15 @@ impl Parameter {
 #[derive(Clone, Debug)]
 pub enum IntParameter {
     Confirm(i64),
-    Lazy(Box<Gen>),
+    Lazy(Box<Token>),
 }
 #[derive(Clone, Debug)]
 pub enum StrParameter {
     Confirm(String),
-    Lazy(Box<Gen>),
+    Lazy(Box<Token>),
 }
 
-fn cul(a: &Gen, b: &Gen, op: &Op) -> Option<Gen> {
-    use crate::token::{IntParameter::*, RandomInteger::*};
-    let (l1, r1) = match a {
-        RandomInteger(Between(l, r)) => (resolve!(l, int), resolve!(r, int)),
-        RandomInteger(NoGreaterThan(r)) => (0, resolve!(r, int)),
-        _ => return None,
-    };
-    let (l2, r2) = match b {
-        RandomInteger(Between(l, r)) => (resolve!(l, int), resolve!(r, int)),
-        RandomInteger(NoGreaterThan(r)) => (0, resolve!(r, int)),
-        _ => return None,
-    };
-    Some(RandomIntegerPair(l1, r1, l2, r2, *op))
-}
-pub fn cul_token(tokens: &Vec<Token>) -> Option<Vec<Gen>> {
-    let mut gens = Vec::new();
-    let mut cur_op = None;
-    for t in tokens.iter() {
-        match t {
-            Token::Gen(gen) => {
-                if let Some(op) = cur_op {
-                    let ind = gens.len() - 1;
-                    gens[ind] = cul(gens.last()?, gen, op)?;
-                    cur_op = None;
-                } else {
-                    gens.push(gen.clone());
-                }
-            }
-            Token::Op(op) => {
-                cur_op = Some(op);
-            }
-        }
-    }
-    cur_op.is_none().then_some(gens)
-}
-impl Gen {
+impl Token {
     pub fn generate(&self) -> Option<Parameter> {
         use crate::token::{IntParameter::*, RandomInteger::*};
         match self {
@@ -164,8 +130,7 @@ impl Gen {
             )))),
             TokenGroup(v) => {
                 let mut s = String::new();
-                let mut gens = cul_token(v)?;
-                for i in gens.iter_mut() {
+                for i in v.iter() {
                     s.push_str(&i.generate_str()?);
                 }
                 Some(Str(StrParameter::Confirm(s)))
@@ -174,7 +139,7 @@ impl Gen {
                 let mut s = String::new();
                 let times = resolve!(ip, size);
                 for _ in 0..times {
-                    s.push_str(&token.gen()?.generate_str()?);
+                    s.push_str(&token.generate_str()?);
                 }
                 Some(Str(StrParameter::Confirm(s)))
             }
@@ -189,14 +154,16 @@ impl Gen {
                     v2.push((resolve!(ip, size), token));
                 }
                 let token = distribute(v2)?;
-                if let Token::Gen(gen) = token {
-                    gen.generate()
-                } else {
-                    None
-                }
+                token.generate()
             }
             RandomIntegerPair(l1, r1, l2, r2, op) => {
-                let (a, b) = random_pair(*l1, *r1, *l2, *r2, *op);
+                let (a, b) = random_pair(
+                    resolve!(l1, int),
+                    resolve!(r1, int),
+                    resolve!(l2, int),
+                    resolve!(r2, int),
+                    *op,
+                );
                 let mut s = a.to_string().with(' ');
                 s.push_str(&b.to_string());
                 Some(Str(StrParameter::Confirm(s.with(' '))))

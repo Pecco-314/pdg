@@ -8,7 +8,7 @@ mod token;
 use crate::{
     details::{error_info, Ignore},
     parser::{config, file_range, token},
-    token::{cul_token, Config, Token},
+    token::{Config, Token},
 };
 use colour::*;
 use powershell_script;
@@ -90,10 +90,8 @@ fn generate(fileid: usize, tokens: &Vec<Token>, folder: &PathBuf, config: &Confi
     let filename = format!("{}{}.in", prefix, fileid);
     println!("Generating {}", filename);
     let target = folder.join(&filename);
-    let gens = cul_token(&tokens)
-        .unwrap_or_else(|| error_info("Something went wrong while culculating tokens"));
     let mut s = String::new();
-    for i in gens.iter() {
+    for i in tokens.iter() {
         s.push_str(&i.generate_str().unwrap_or_else(|| {
             error_info(&format!(
                 "Something went wrong while generating {}",
