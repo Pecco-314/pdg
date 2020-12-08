@@ -74,10 +74,10 @@ pub fn integer_pair_token() -> impl Parser<ParseResult = Token> {
         .and(
             spaces()
                 .with(
-                    string("<")
-                        .or(string(">"))
-                        .or(string("<="))
-                        .or(string(">=")),
+                    string("<=")
+                        .or(string(">="))
+                        .or(string("<"))
+                        .or(string(">")),
                 )
                 .skip(spaces()),
         )
