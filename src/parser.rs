@@ -54,24 +54,35 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
         })
 }
 
+#[derive(Copy, Clone)]
+struct TokenParser;
+impl Parser for TokenParser {
+    type ParseResult = Token;
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+        spaces()
+            .with(
+                attempt(constant())
+                    .or(attempt(integer_pair_token()))
+                    .or(random_integer_token())
+                    .or(random_string_token())
+                    .or(repeated_token())
+                    .or(array_token())
+                    .or(distribute_token())
+                    .or(token_group()),
+            )
+            .skip(spaces())
+            .or(token().between(char('('), char(')')))
+            .and(optional(tail()))
+            .flat_map(|tpl| match tpl {
+                (t, None) => Some(t),
+                (t1, Some(Tail::AddTail(t2))) => Some(SumToken(Box::new(t1), Box::new(t2))),
+            })
+            .parse(buf)
+    }
+}
+
 pub fn token() -> impl Parser<ParseResult = Token> {
-    spaces()
-        .with(
-            attempt(constant())
-                .or(attempt(integer_pair_token()))
-                .or(random_integer_token())
-                .or(random_string_token())
-                .or(repeated_token())
-                .or(array_token())
-                .or(distribute_token())
-                .or(token_group()),
-        )
-        .and(optional(tail()))
-        .flat_map(|tpl| match tpl {
-            (t, None) => Some(t),
-            (t1, Some(Tail::AddTail(t2))) => Some(SumToken(Box::new(t1), Box::new(t2))),
-        })
-        .skip(spaces())
+    TokenParser
 }
 
 pub fn integer_pair_token() -> impl Parser<ParseResult = Token> {
