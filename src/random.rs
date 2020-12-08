@@ -14,18 +14,20 @@ macro_rules! distribute {
 
 #[macro_export]
 macro_rules! random_range {
-    ($a:expr, $b:expr) => {
-        if $a > $b {
+    ($a:expr, $b:expr) => {{
+        let x = $a;
+        let y = $b;
+        if x > y {
             use crate::details::error_info;
             error_info(&format!(
                 "Tried to generate random integer between {} and {}, but {} > {}",
-                $a, $b, $a, $b,
+                x, y, x, y,
             ))
         } else {
             use rand::prelude::{thread_rng, Rng};
-            thread_rng().gen_range($a, $b + 1)
+            thread_rng().gen_range(x, y + 1)
         }
-    };
+    }};
 }
 
 pub fn distribute<I>(v: Vec<(usize, I)>) -> Option<I> {

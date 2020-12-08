@@ -62,6 +62,7 @@ pub enum Token {
     Distribute(Vec<(IntParameter, Token)>),
     RandomIntegerPair(IntParameter, IntParameter, IntParameter, IntParameter, Cmp),
     SumToken(Box<Token>, Box<Token>),
+    DifToken(Box<Token>, Box<Token>),
 }
 #[derive(Clone, Debug)]
 pub enum Parameter {
@@ -159,6 +160,12 @@ impl Token {
             SumToken(t1, t2) => match (t1.generate()?, t2.generate()?) {
                 (Int(i1), Int(i2)) => Some(Int(IntParameter::Confirm(
                     resolve!(i1, int) + resolve!(i2, int),
+                ))),
+                _ => None,
+            },
+            DifToken(t1, t2) => match (t1.generate()?, t2.generate()?) {
+                (Int(i1), Int(i2)) => Some(Int(IntParameter::Confirm(
+                    resolve!(i1, int) - resolve!(i2, int),
                 ))),
                 _ => None,
             },

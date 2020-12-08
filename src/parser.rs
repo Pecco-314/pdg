@@ -75,7 +75,21 @@ impl Parser for TokenParser {
             .and(optional(tail()))
             .flat_map(|tpl| match tpl {
                 (t, None) => Some(t),
-                (t1, Some(Tail::AddTail(t2))) => Some(SumToken(Box::new(t1), Box::new(t2))),
+                (
+                    t1,
+                    Some(Tail {
+                        opr: '+',
+                        token: t2,
+                    }),
+                ) => Some(SumToken(Box::new(t1), Box::new(t2))),
+                (
+                    t1,
+                    Some(Tail {
+                        opr: '-',
+                        token: t2,
+                    }),
+                ) => Some(DifToken(Box::new(t1), Box::new(t2))),
+                _ => None,
             })
             .parse(buf)
     }
@@ -129,9 +143,10 @@ fn exclmark_parameter() -> impl Parser<ParseResult = Parameter> {
     char('!').with(
         random_string_token()
             .flat_map(|token| token.generate())
-            .or(attempt(
-                random_integer_token().flat_map(|token| token.generate()),
-            )),
+            .or(token().flat_map(|token| match token.generate() {
+                p @ Some(Int(_)) => p,
+                _ => None,
+            })),
     )
 }
 
@@ -139,7 +154,10 @@ fn quesmark_parameter() -> impl Parser<ParseResult = Parameter> {
     char('?').with(
         random_string_token()
             .map(|token| (Str(StrParameter::Lazy(Box::new(token)))))
-            .or(random_integer_token().map(|token| Int(IntParameter::Lazy(Box::new(token))))),
+            .or(token().flat_map(|token| match token.generate() {
+                Some(Int(_)) => Some(Int(IntParameter::Lazy(Box::new(token)))),
+                _ => None,
+            })),
     )
 }
 
@@ -308,25 +326,28 @@ fn array_token() -> impl Parser<ParseResult = Token> {
     ArrayTokenParser
 }
 
-pub enum Tail {
-    AddTail(Token),
+pub struct Tail {
+    opr: char,
+    token: Token,
 }
 #[derive(Copy, Clone)]
-struct AddTailParser;
-impl Parser for AddTailParser {
+struct TailParser;
+impl Parser for TailParser {
     type ParseResult = Tail;
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         spaces()
-            .skip(char('+'))
+            .with(char('+').or(char('-')))
             .skip(spaces())
-            .with(token())
-            .flat_map(|token| Some(Tail::AddTail(token)))
+            .and(token())
+            .flat_map(|(opr, token)| {
+                Some(Tail {
+                    opr: opr,
+                    token: token,
+                })
+            })
             .parse(buf)
     }
 }
-pub fn add_tail() -> impl Parser<ParseResult = Tail> {
-    AddTailParser
-}
 pub fn tail() -> impl Parser<ParseResult = Tail> {
-    add_tail()
+    TailParser
 }
