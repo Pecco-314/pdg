@@ -61,6 +61,7 @@ pub enum Token {
     Array(IntParameter, Box<Token>),
     Distribute(Vec<(IntParameter, Token)>),
     RandomIntegerPair(IntParameter, IntParameter, IntParameter, IntParameter, Cmp),
+    SumToken(Box<Token>, Box<Token>),
 }
 #[derive(Clone, Debug)]
 pub enum Parameter {
@@ -155,6 +156,12 @@ impl Token {
                 Some(Str(StrParameter::Confirm(s.with(' '))))
             }
             RandomString(rs) => Some(Str(StrParameter::Confirm(random_string(&rs)?))),
+            SumToken(t1, t2) => match (t1.generate()?, t2.generate()?) {
+                (Int(i1), Int(i2)) => Some(Int(IntParameter::Confirm(
+                    resolve!(i1, int) + resolve!(i2, int),
+                ))),
+                _ => None,
+            },
         }
     }
     pub fn generate_str(&self) -> Option<String> {

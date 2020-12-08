@@ -66,6 +66,11 @@ pub fn token() -> impl Parser<ParseResult = Token> {
                 .or(distribute_token())
                 .or(token_group()),
         )
+        .and(optional(tail()))
+        .flat_map(|tpl| match tpl {
+            (t, None) => Some(t),
+            (t1, Some(Tail::AddTail(t2))) => Some(SumToken(Box::new(t1), Box::new(t2))),
+        })
         .skip(spaces())
 }
 
@@ -290,4 +295,27 @@ impl Parser for ArrayTokenParser {
 }
 fn array_token() -> impl Parser<ParseResult = Token> {
     ArrayTokenParser
+}
+
+pub enum Tail {
+    AddTail(Token),
+}
+#[derive(Copy, Clone)]
+struct AddTailParser;
+impl Parser for AddTailParser {
+    type ParseResult = Tail;
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+        spaces()
+            .skip(char('+'))
+            .skip(spaces())
+            .with(token())
+            .flat_map(|token| Some(Tail::AddTail(token)))
+            .parse(buf)
+    }
+}
+pub fn add_tail() -> impl Parser<ParseResult = Tail> {
+    AddTailParser
+}
+pub fn tail() -> impl Parser<ParseResult = Tail> {
+    add_tail()
 }
