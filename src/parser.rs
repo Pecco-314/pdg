@@ -55,8 +55,8 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
 }
 
 #[derive(Copy, Clone)]
-struct TokenParser;
-impl Parser for TokenParser {
+struct Token1Parser;
+impl Parser for Token1Parser {
     type ParseResult = Token;
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         spaces()
@@ -71,7 +71,7 @@ impl Parser for TokenParser {
                     .or(token_group()),
             )
             .skip(spaces())
-            .or(token().between(char('('), char(')')))
+            .or(token1().between(char('('), char(')')))
             .and(optional(tail()))
             .flat_map(|tpl| match tpl {
                 (t, None) => Some(t),
@@ -94,9 +94,11 @@ impl Parser for TokenParser {
             .parse(buf)
     }
 }
-
+fn token1() -> impl Parser<ParseResult = Token> {
+    Token1Parser
+}
 pub fn token() -> impl Parser<ParseResult = Token> {
-    TokenParser
+    token1()
 }
 
 pub fn integer_pair_token() -> impl Parser<ParseResult = Token> {
@@ -143,9 +145,12 @@ fn exclmark_parameter() -> impl Parser<ParseResult = Parameter> {
     char('!').with(
         random_string_token()
             .flat_map(|token| token.generate())
-            .or(token().flat_map(|token| match token.generate() {
-                p @ Some(Int(_)) => p,
-                _ => None,
+            .or(token().flat_map(|token| {
+                if token.is_int_token() {
+                    token.generate()
+                } else {
+                    None
+                }
             })),
     )
 }
@@ -154,9 +159,12 @@ fn quesmark_parameter() -> impl Parser<ParseResult = Parameter> {
     char('?').with(
         random_string_token()
             .map(|token| (Str(StrParameter::Lazy(Box::new(token)))))
-            .or(token().flat_map(|token| match token.generate() {
-                Some(Int(_)) => Some(Int(IntParameter::Lazy(Box::new(token)))),
-                _ => None,
+            .or(token().flat_map(|token| {
+                if token.is_int_token() {
+                    Some(Int(IntParameter::Lazy(Box::new(token))))
+                } else {
+                    None
+                }
             })),
     )
 }

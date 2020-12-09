@@ -179,4 +179,12 @@ impl Token {
             _ => None,
         }
     }
+    pub fn is_int_token(&self) -> bool {
+        match self {
+            ConstantInteger(_) | RandomInteger(_) => true,
+            SumToken(t1, t2) if t1.is_int_token() && t2.is_int_token() => true,
+            DifToken(t1, t2) if t1.is_int_token() && t2.is_int_token() => true,
+            _ => false,
+        }
+    }
 }
