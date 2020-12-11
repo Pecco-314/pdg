@@ -1,6 +1,4 @@
 #![feature(iterator_fold_self)]
-#![feature(bool_to_option)]
-#![feature(label_break_value)]
 mod details;
 mod parser;
 mod random;

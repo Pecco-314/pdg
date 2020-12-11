@@ -1,3 +1,5 @@
+// FIXIT: 换行符被解析成除号
+// FIXIT: 有时明明有语法错误，却被忽略而非报错
 use crate::{
     details::warning_info,
     token::{Parameter::*, RandomString::*, Token::*, *},
@@ -55,8 +57,8 @@ pub fn file_range() -> impl Parser<ParseResult = Range<usize>> {
 }
 
 #[derive(Copy, Clone)]
-struct Token1Parser;
-impl Parser for Token1Parser {
+struct TokenUnit;
+impl Parser for TokenUnit {
     type ParseResult = Token;
     fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
         spaces()
@@ -71,34 +73,83 @@ impl Parser for Token1Parser {
                     .or(token_group()),
             )
             .skip(spaces())
-            .or(token1().between(char('('), char(')')))
-            .and(optional(tail()))
-            .flat_map(|tpl| match tpl {
-                (t, None) => Some(t),
-                (
-                    t1,
-                    Some(Tail {
-                        opr: '+',
-                        token: t2,
-                    }),
-                ) => Some(SumToken(Box::new(t1), Box::new(t2))),
-                (
-                    t1,
-                    Some(Tail {
-                        opr: '-',
-                        token: t2,
-                    }),
-                ) => Some(DifToken(Box::new(t1), Box::new(t2))),
-                _ => None,
-            })
+            .or(token().between(char('('), char(')')))
             .parse(buf)
     }
 }
-fn token1() -> impl Parser<ParseResult = Token> {
-    Token1Parser
+fn token_unit() -> impl Parser<ParseResult = Token> {
+    TokenUnit
+}
+
+#[derive(Copy, Clone)]
+struct TokenWithMulAndDiv;
+impl Parser for TokenWithMulAndDiv {
+    type ParseResult = Token;
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+        let tail = || {
+            optional(
+                spaces()
+                    .with(char('*').or(char('/')))
+                    .skip(spaces())
+                    .and(token_unit()),
+            )
+        };
+        let mut cur = token_unit().parse(buf)?;
+        for res in tail().iter(buf) {
+            match res {
+                Some(('*', r)) => {
+                    cur = ProdToken(Box::new(cur), Box::new(r));
+                }
+                Some(('/', r)) => {
+                    cur = QuotToken(Box::new(cur), Box::new(r));
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        Ok(cur)
+    }
+}
+fn token_with_mul_and_div() -> impl Parser<ParseResult = Token> {
+    TokenWithMulAndDiv
+}
+
+#[derive(Copy, Clone)]
+struct TokenWithAddAndSub;
+impl Parser for TokenWithAddAndSub {
+    type ParseResult = Token;
+    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
+        let tail = || {
+            optional(
+                spaces()
+                    .with(char('+').or(char('-')))
+                    .skip(spaces())
+                    .and(token_with_mul_and_div()),
+            )
+        };
+        let mut cur = token_with_mul_and_div().parse(buf)?;
+        for res in tail().iter(buf) {
+            match res {
+                Some(('+', r)) => {
+                    cur = SumToken(Box::new(cur), Box::new(r));
+                }
+                Some(('-', r)) => {
+                    cur = DifToken(Box::new(cur), Box::new(r));
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        Ok(cur)
+    }
+}
+pub fn token_with_add_and_sub() -> impl Parser<ParseResult = Token> {
+    TokenWithAddAndSub
 }
 pub fn token() -> impl Parser<ParseResult = Token> {
-    token1()
+    token_with_add_and_sub()
 }
 
 pub fn integer_pair_token() -> impl Parser<ParseResult = Token> {
@@ -336,30 +387,4 @@ impl Parser for ArrayTokenParser {
 }
 fn array_token() -> impl Parser<ParseResult = Token> {
     ArrayTokenParser
-}
-
-pub struct Tail {
-    opr: char,
-    token: Token,
-}
-#[derive(Copy, Clone)]
-struct TailParser;
-impl Parser for TailParser {
-    type ParseResult = Tail;
-    fn parse<'a>(&self, buf: &mut &'a str) -> Result<Self::ParseResult, ParseError<'a>> {
-        spaces()
-            .with(char('+').or(char('-')))
-            .skip(spaces())
-            .and(token())
-            .flat_map(|(opr, token)| {
-                Some(Tail {
-                    opr: opr,
-                    token: token,
-                })
-            })
-            .parse(buf)
-    }
-}
-pub fn tail() -> impl Parser<ParseResult = Tail> {
-    TailParser
 }
