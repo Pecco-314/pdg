@@ -63,7 +63,7 @@ impl Parser for Token1Parser {
             .with(
                 attempt(constant())
                     .or(attempt(integer_pair_token()))
-                    .or(random_integer_token())
+                    .or(attempt(random_integer_token()))
                     .or(random_string_token())
                     .or(repeated_token())
                     .or(array_token())
@@ -237,6 +237,10 @@ impl Parser for ParameterParser {
                     .skip(preview(satisfy(|c: char| !c.is_alphabetic())))
                     .map(|_| Bool(false)),
             ))
+            .or(attempt(token()).flat_map(|t| match t.generate()? {
+                p @ Int(_) => Some(p),
+                _ => None,
+            }))
             .or(word().map(|e| Enum(e)))
             .parse(buf)
     }
